@@ -620,8 +620,10 @@ value print_foreach print_ast eval_expr =
 value print_update_fam conf base fcd digest =
   match p_getenv conf.env "m" with
   [ Some
-      ("ADD_FAM" | "ADD_FAM_OK" | "ADD_PAR" | "MOD_FAM" | "MOD_FAM_OK" |
-       "MRG_DUP_FAM_Y_N" | "MRG_FAM" | "MRG_FAM_OK" | "MRG_MOD_FAM_OK") ->
+      (("ADD_FAM" | "ADD_FAM_OK" | "ADD_PAR" | "MOD_FAM" | "MOD_FAM_OK" |
+       "MRG_DUP_FAM_Y_N" | "MRG_FAM" | "MRG_FAM_OK" | "MRG_MOD_FAM_OK") as meth) ->
+      let () = Printf.printf "UpdateFam.print_update_fam %s\n%!" meth in
+
       let env = [("digest", Vstring digest)] in
       Hutil.interp conf base "updfam"
         {Templ.eval_var = eval_var conf base;
@@ -744,6 +746,7 @@ value print_add conf base =
 value print_add_parents conf base =
   match p_getint conf.env "ip" with
   [ Some i ->
+      let () = Printf.printf "print_add_parents conf base. ip=%d\n%!" i in
       let p = poi base (Adef.iper_of_int i) in
       let fam =
         {marriage = Adef.codate_None; marriage_place = ""; marriage_note = "";
@@ -759,6 +762,7 @@ value print_add_parents conf base =
            [| (sou base (get_first_name p), sou base (get_surname p),
                get_occ p, Update.Link, "") |]}
       in
+
       print_update_fam conf base (fam, cpl, des) ""
   | _ -> incorrect_request conf ]
 ;

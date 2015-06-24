@@ -430,7 +430,18 @@ value reconstitute_from_fevents conf fevents marr div =
   (marr, div)
 ;
 
+(*
+         Config.config ->
+         Gwdb.base ->
+         (string * string * int * Update.create * string, string)
+         Def.gen_family *
+         (string * string * int * Update.create * string) Def.gen_couple *
+         (string * string * int * Update.create * string) Def.gen_descend *
+         bool
+
+ *)
 value reconstitute_family conf base =
+  let () = Printf.printf "reconstitute_family\n%!" in
   let ext = False in
   let relation =
     match (p_getenv conf.env "mrel", p_getenv conf.env "nsck") with
@@ -699,6 +710,7 @@ value check_parents conf base cpl =
 ;
 
 value check_family conf base fam cpl =
+  let () = Printf.printf "check_family\n%!" in
   (* N'est plus nécessaire avec les évènements. Est fait dans fevents. *)
   (*let err_witness = check_witnesses conf base fam in*)
   let err_parents = check_parents conf base cpl in
@@ -1333,6 +1345,7 @@ value effective_mod conf base sfam scpl sdes = do {
 };
 
 value effective_add conf base sfam scpl sdes =
+  let () = Printf.printf "UpdateFamOK.effective_add\n%!" in
   let fi = Adef.ifam_of_int (nb_of_families base) in
   let created_p = ref [] in
   let psrc =
@@ -1602,6 +1615,7 @@ value print_mod_ok conf base (wl, ml) cpl des =
 ;
 
 value print_add_ok conf base (wl, ml) cpl des =
+  let () = Printf.printf "UpdateFamOK.print_add_ok\n%!" in
   let title _ = Wserver.wprint "%s" (capitale (transl conf "family added")) in
   do {
     header conf title;
@@ -1675,7 +1689,9 @@ value print_add o_conf base =
   let () = removed_string.val := [] in
   let conf = Update.update_conf o_conf in
   try
+    let () = Printf.printf "print_add\n%!" in
     let (sfam, scpl, sdes, ext) = reconstitute_family conf base in
+    let (_: Def.gen_family (string * string * int * Update.create * string) string) = sfam in
     let redisp =
       match p_getenv conf.env "return" with
       [ Some _ -> True

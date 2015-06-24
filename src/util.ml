@@ -3154,6 +3154,7 @@ value update_wf_trace conf fname =
 
 value commit_patches conf base =
   do {
+    Printf.printf "Util.commit_patches\n%!";
     Gwdb.commit_patches base;
     conf.henv :=
       List.map

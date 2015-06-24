@@ -383,7 +383,9 @@ value family_m conf base =
       [ Some p -> Perso.print_ascend conf base p
       | _ -> very_unknown conf ]
   | Some "ADD_FAM" when conf.wizard -> UpdateFam.print_add conf base
-  | Some "ADD_FAM_OK" when conf.wizard -> UpdateFamOk.print_add conf base
+  | Some "ADD_FAM_OK" when conf.wizard ->
+     let () = Printf.printf "Request.ml: ADD_FAM_OK\n%!" in
+     UpdateFamOk.print_add conf base
   | Some "ADD_IND" when conf.wizard -> UpdateInd.print_add conf base
   | Some "ADD_IND_OK" when conf.wizard -> UpdateIndOk.print_add conf base
   | Some "ADD_PAR" when conf.wizard -> UpdateFam.print_add_parents conf base
