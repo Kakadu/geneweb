@@ -22,6 +22,8 @@ type create_info =
 type create = [ Create of sex and option create_info | Link ];
 type key = (string * string * int * create * string);
 
+value string_of_key (a,b,n,_,c) = Printf.sprintf "(\"%s\" \"%s\" %d _ \"%s\")" a b n c;
+
 value infer_death conf birth bapt =
   match (birth, bapt) with
   [ (Some (Dgreg d _), _) ->

@@ -713,6 +713,7 @@ value get_consang a =
   | _ -> wrap_asc f f f a ]
 ;
 value get_parents a =
+  let () = print_endline "Gwdb.get_parents" in
   let f pf = pf.get_parents in
   match a with
   [ Person2 db2 i _ ->

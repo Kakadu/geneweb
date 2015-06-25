@@ -10,6 +10,7 @@ open Gwdb;
 open Hutil;
 open Mutil;
 open Util;
+open Printf;
 
 (* Liste des string dont on a supprimé un caractère.       *)
 (* Utilisé pour le message d'erreur lors de la validation. *)
@@ -1683,6 +1684,18 @@ value forbidden_disconnected conf sfam scpl sdes =
   else False
 ;
 
+value fix_family sfam scpl =
+  let () = printf "fix_family\n%!" in
+  let (_: Def.gen_family Update.key string) = sfam in
+  let (_: Adef.gen_couple Update.key) = scpl in
+  let () = printf "%s\n%!" (Update.string_of_key (Adef.father scpl) ) in
+  let () = printf "%s\n%!" (Update.string_of_key (Adef.mother scpl) ) in
+  (* TODO: get person from Db using Update.key *)
+  (* let par_events = Gwdb.get_pevents (Adef.father scpl) in *)
+  (* let () = printf "parent events (len = %d)\n%!" (List.length par_events) in *)
+  ()
+;
+
 value print_add o_conf base =
   (* Attention ! On pense à remettre les compteurs à *)
   (* zéro pour la détection des caractères interdits *)
@@ -1753,6 +1766,7 @@ value print_add o_conf base =
           Util.commit_patches conf base;
           History.record conf base changed act;
           Update.delete_topological_sort conf base;
+          fix_family sfam scpl;
           print_add_ok conf base (wl, ml) cpl des
         } ]
   with

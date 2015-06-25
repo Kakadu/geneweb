@@ -69,6 +69,7 @@ value relation_print conf base p =
 ;
 
 value person_selected conf base p =
+  let () = print_endline "person_selected" in
   match p_getenv conf.senv "em" with
   [ Some "R" -> relation_print conf base p
   | Some mode -> incorrect_request conf

@@ -9,6 +9,7 @@ open Gwdb;
 open Mutil;
 open TemplAst;
 open Util;
+open Printf;
 
 value max_im_wid = 240;
 value max_im_hei = 240;
@@ -422,6 +423,7 @@ value sosa_ht = Hashtbl.create 5003;
     [Rem] : Exporté en clair hors de ce module.                             *)
 (* ************************************************************************ *)
 value build_sosa_ht conf base =
+  let () = Printf.printf "build_sosa_ht\n%!" in
   let () = load_ascends_array base in
   let () = load_couples_array base in
   match Util.find_sosa_ref conf base with
@@ -538,6 +540,8 @@ value get_single_sosa conf base p =
     [Rem] : Exporté en clair hors de ce module.                             *)
 (* ************************************************************************ *)
 value print_sosa conf base p link =
+  let () = Printf.printf "print_sosa\n%!" in
+
   let sosa_num = get_sosa_person conf base p in
   if Num.gt sosa_num Num.zero then
     match Util.find_sosa_ref conf base with
@@ -3588,6 +3592,7 @@ value print_foreach conf base print_ast eval_expr =
     try int_of_string s with [ Failure _ -> raise Not_found ]
   in
   let rec print_foreach env ini_ep loc s sl ell al =
+    let () = print_endline "print_foreach" in
     let rec loop ((a, _) as ep) efam =
       fun
       [ [s] -> print_simple_foreach env ell al ini_ep ep efam loc s
@@ -3657,6 +3662,7 @@ value print_foreach conf base print_ast eval_expr =
     let efam = get_env "fam" env in
     loop ini_ep efam [s :: sl]
   and print_simple_foreach env el al ini_ep ep efam loc =
+    let () = print_endline "print_simple_foreach" in
     fun
     [ "alias" -> print_foreach_alias env al ep
     | "ancestor" -> print_foreach_ancestor env al ep
@@ -4371,6 +4377,7 @@ value eval_predefined_apply conf env f vl =
 ;
 
 value gen_interp_templ menu title templ_fname conf base p = do {
+  let () = Printf.printf "gen_interp_templ\n%!" in
   template_file.val := templ_fname ^ ".txt";
   let ep = (p, authorized_age conf base p) in
   let emal =
@@ -4474,6 +4481,7 @@ value interp_notempl_with_menu title templ_fname conf base p = do {
 (* Main *)
 
 value print conf base p =
+  let () = Printf.printf "print" in
   let passwd =
     if conf.wizard || conf.friend then None
     else
@@ -4542,6 +4550,7 @@ value print_ascend conf base p =
 ;
 
 value print_what_links conf base p =
+  let () = print_endline "print_what_links" in
   if authorized_age conf base p then do {
     let key =
       let fn = Name.lower (sou base (get_first_name p)) in
