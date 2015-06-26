@@ -79,6 +79,7 @@ value reconstitute_somebody conf var =
 ;
 
 value reconstitute_parent_or_child conf var default_surname =
+  let () = printf "reconstitute_parent_or_child default_surname:\"%s\"\n%!" default_surname in
   let first_name = no_html_tags (only_printable (getn conf var "fn")) in
   let surname =
     let surname = no_html_tags (only_printable (getn conf var "sn")) in
@@ -97,6 +98,7 @@ value reconstitute_parent_or_child conf var default_surname =
       }
     else (first_name, surname)
   in
+  let () = printf "fn,sn = ('%s', '%s')\n%!" first_name surname in
   let occ = try int_of_string (getn conf var "occ") with [ Failure _ -> 0 ] in
   let create_info =
     let b = Update.reconstitute_date conf (var ^ "b") in
@@ -526,6 +528,7 @@ value reconstitute_family conf base =
           ([c :: parents], ext)
       | None -> ([], ext) ]
   in
+  let (_: list Update.key) = parents in
   let comment =
     only_printable_or_nl (strip_all_trailing_spaces (get conf "comment"))
   in
@@ -1684,12 +1687,42 @@ value forbidden_disconnected conf sfam scpl sdes =
   else False
 ;
 
-value fix_family sfam scpl =
+value fix_family conf base sfam scpl =
   let () = printf "fix_family\n%!" in
   let (_: Def.gen_family Update.key string) = sfam in
   let (_: Adef.gen_couple Update.key) = scpl in
   let () = printf "%s\n%!" (Update.string_of_key (Adef.father scpl) ) in
   let () = printf "%s\n%!" (Update.string_of_key (Adef.mother scpl) ) in
+
+  let father_per =
+    match Adef.father scpl with
+      [ (f, s, o, Update.Link, _) -> person_of_key base f s o
+      | _ -> None ]
+  in
+
+  let mother_per =
+    match Adef.father scpl with
+      [ (f, s, o, Update.Link, _) -> person_of_key base f s o
+      | _ -> None
+      ]
+  in
+
+  let () = match (father_per,mother_per) with
+      [ (Some father, Some mother) ->
+        let () = printf "got them\n%!" in
+        let (father: person) = poi base father in
+        let mother = poi base mother in
+        let ffamilies = Array.map (foi base) (get_family father) in
+        let () = printf "Father has %d families\n%!" (Array.length ffamilies) in
+        let () = Array.iteri (fun n family ->
+                              let mother = poi base ((get_mother family)) in
+                              printf "Family %d: mother = %s\n" n "???"
+                             ) ffamilies in
+        ()
+      | _ -> printf "can't get father of mother from DB\n%!"
+      ]
+  in
+  (* let (_:int) = Adef.mother scpl in *)
   (* TODO: get person from Db using Update.key *)
   (* let par_events = Gwdb.get_pevents (Adef.father scpl) in *)
   (* let () = printf "parent events (len = %d)\n%!" (List.length par_events) in *)
@@ -1705,6 +1738,7 @@ value print_add o_conf base =
     let () = Printf.printf "print_add\n%!" in
     let (sfam, scpl, sdes, ext) = reconstitute_family conf base in
     let (_: Def.gen_family (string * string * int * Update.create * string) string) = sfam in
+
     let redisp =
       match p_getenv conf.env "return" with
       [ Some _ -> True
@@ -1766,7 +1800,7 @@ value print_add o_conf base =
           Util.commit_patches conf base;
           History.record conf base changed act;
           Update.delete_topological_sort conf base;
-          fix_family sfam scpl;
+          fix_family conf base sfam scpl;
           print_add_ok conf base (wl, ml) cpl des
         } ]
   with

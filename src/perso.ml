@@ -4480,8 +4480,8 @@ value interp_notempl_with_menu title templ_fname conf base p = do {
 
 (* Main *)
 
-value print conf base p =
-  let () = Printf.printf "print" in
+value print conf base (p: Gwdb.person) =
+  let () = Printf.printf "Perso.print" in
   let passwd =
     if conf.wizard || conf.friend then None
     else

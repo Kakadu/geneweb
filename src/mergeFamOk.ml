@@ -8,6 +8,7 @@ open Gutil;
 open Gwdb;
 open Hutil;
 open Util;
+open Printf;
 
 value rec merge_lists l1 =
   fun
@@ -235,6 +236,13 @@ value print_mod_merge_ok conf base wl cpl des = do {
 };
 
 value effective_mod_merge conf base o_f1 o_f2 sfam scpl sdes =
+  let (_: Def.gen_family Def.iper string) = o_f1 in
+  let (_: Def.gen_family Def.iper string) = o_f2 in
+  let (_: Def.gen_family Update.key string) = sfam in
+  let (_: Def.gen_couple Update.key) = scpl in
+  let (_: Def.gen_descend Update.key) = sdes in
+
+  let () = printf " effective_mod_merge" in
   match p_getint conf.env "i2" with
   [ Some i2 ->
       let ifam2 = Adef.ifam_of_int i2 in
@@ -250,8 +258,8 @@ value effective_mod_merge conf base o_f1 o_f2 sfam scpl sdes =
         in
         Util.commit_patches conf base;
         let s =
-          let sl = 
-            [fam.comment; fam.fsources; fam.marriage_note; fam.marriage_src] 
+          let sl =
+            [fam.comment; fam.fsources; fam.marriage_note; fam.marriage_src]
           in
           let sl =
             loop (fam.fevents) sl where rec loop l accu =
