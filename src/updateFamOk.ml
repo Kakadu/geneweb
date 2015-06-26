@@ -1701,7 +1701,7 @@ value fix_family conf base sfam scpl =
   in
 
   let mother_per =
-    match Adef.father scpl with
+    match Adef.mother scpl with
       [ (f, s, o, Update.Link, _) -> person_of_key base f s o
       | _ -> None
       ]
@@ -1712,20 +1712,25 @@ value fix_family conf base sfam scpl =
         let () = printf "got them\n%!" in
         let (father: person) = poi base father in
         let mother = poi base mother in
-        let ffamilies = Array.map (foi base) (get_family father) in
-        let () = printf "Father has %d families\n%!" (Array.length ffamilies) in
-        let () = Array.iteri (fun n family ->
-                              let mother = poi base ((get_mother family)) in
-                              printf "Family %d: mother = %s\n" n "???"
-                             ) ffamilies in
+        let ffamilies = List.map (foi base) (Array.to_list (get_family father)) in
+        let () = printf "Mother: %s %s\n%!" (sou base (get_surname mother))
+                                       (sou base (get_first_name mother)) in
+        let () = printf "Father has %d families\n%!" (List.length ffamilies) in
+        let families_to_merge: list family =
+          List.filter (fun family ->
+                       let wife: Gwdb.person = poi base ((get_mother family)) in
+                       let () = printf "%s %s\n%!" (sou base (get_surname wife))
+                                       (sou base (get_first_name wife)) in
+                       (eq_istr (get_surname wife) (get_surname mother)) &&
+                         (eq_istr (get_first_name wife) (get_first_name mother))
+                      ) ffamilies
+        in
+        let () = printf "Found %d families to merge\n%!" (List.length families_to_merge) in
+        (* TODO: call MergeFamOk.effective_mod_merge somehow *)
         ()
       | _ -> printf "can't get father of mother from DB\n%!"
       ]
   in
-  (* let (_:int) = Adef.mother scpl in *)
-  (* TODO: get person from Db using Update.key *)
-  (* let par_events = Gwdb.get_pevents (Adef.father scpl) in *)
-  (* let () = printf "parent events (len = %d)\n%!" (List.length par_events) in *)
   ()
 ;
 
