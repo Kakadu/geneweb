@@ -935,7 +935,7 @@ value wrap_des f g h =
       | None -> g family2_fun (db2, i) ] ]
 ;
 
-value get_comment fam =
+value get_comment (fam:family) =
   let f pf = pf.get_comment in
   wrap_fam f f f fam
 ;

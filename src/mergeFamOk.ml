@@ -235,18 +235,19 @@ value print_mod_merge_ok conf base wl cpl des = do {
   trailer conf;
 };
 
-value effective_mod_merge conf base o_f1 o_f2 sfam scpl sdes =
-  let (_: Def.gen_family Def.iper string) = o_f1 in
-  let (_: Def.gen_family Def.iper string) = o_f2 in
-  let (_: Def.gen_family Update.key string) = sfam in
-  let (_: Def.gen_couple Update.key) = scpl in
-  let (_: Def.gen_descend Update.key) = sdes in
+value effective_mod_merge: config -> base ->
+                           gen_family iper string ->
+                           gen_family iper string ->
+                           gen_family Update.key string ->
+                           gen_couple Update.key  ->
+                           gen_descend Update.key -> unit
+= fun conf base o_f1 o_f2 sfam scpl sdes ->
 
   let () = printf " effective_mod_merge" in
   match p_getint conf.env "i2" with
   [ Some i2 ->
       let ifam2 = Adef.ifam_of_int i2 in
-      let fam2 = foi base ifam2 in
+      let fam2: Gwdb.family = foi base ifam2 in
       do {
         UpdateFamOk.effective_del conf base (ifam2, fam2);
         let (ifam, fam, cpl, des) =

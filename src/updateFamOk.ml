@@ -443,7 +443,13 @@ value reconstitute_from_fevents conf fevents marr div =
          bool
 
  *)
-value reconstitute_family conf base =
+value reconstitute_family: config -> base ->
+         (gen_family Update.key string *
+         gen_couple Update.key *
+         gen_descend (string * string * int * Update.create * string)  *
+         bool)
+
+= fun conf base ->
   let () = Printf.printf "reconstitute_family\n%!" in
   let ext = False in
   let relation =
@@ -610,6 +616,7 @@ value reconstitute_family conf base =
   (fam, cpl, des, ext)
 ;
 
+(* Removes events without a name and withnessess without a name *)
 value strip_events fevents =
   let strip_array_witness pl =
     let pl =
@@ -632,8 +639,9 @@ value strip_events fevents =
        else accu)
     fevents []
 ;
-
-value strip_array_persons pl =
+(* remove persons with empty firstname *)
+value strip_array_persons: array Update.key -> array Update.key
+= fun pl ->
   let pl =
     List.fold_right
       (fun ((f, s, o, c, _) as p) pl -> if f = "" then pl else [p :: pl])
@@ -653,14 +661,14 @@ value error_family conf base err =
   }
 ;
 
-value check_event_witnesses conf base witnesses =
+value check_event_witnesses conf base witnesses : option string =
   let wl = Array.to_list witnesses in
   let rec loop wl =
     match wl with
     [ [] -> None
     | [((fn, sn, _, _, _), _) :: l] ->
         if fn = "" && sn = "" then
-          (* Champs non renseigné, il faut passer au suivant *)
+          (* If fields are empty go next *)
           loop l
         else if fn = "" || fn = "?" then
           Some ((transl_nth conf "witness/witnesses" 0) ^ (" : ")
@@ -673,7 +681,7 @@ value check_event_witnesses conf base witnesses =
   loop wl
 ;
 
-value check_witnesses conf base fam =
+value check_witnesses conf base fam : option string =
   let wl = Array.to_list fam.witnesses in
   let rec loop wl =
     match wl with
@@ -825,7 +833,7 @@ value family_exclude pfams efam =
 
 value infer_origin_file_from_other_marriages conf base ifam ip =
   let u = poi base ip in
-  let ufams = get_family u in
+  let ufams: array ifam = get_family u in
   let rec loop i =
     if i = Array.length ufams then None
     else if ufams.(i) = ifam then loop (i + 1)
@@ -1206,11 +1214,13 @@ value update_family_with_fevents conf base fam =
 ;
 
 value effective_mod conf base sfam scpl sdes = do {
+  printf "effective_mod\n%!";
   let fi = sfam.fam_index in
   let (oorigin, owitnesses, ofevents) =
     let ofam = foi base fi in
     (get_origin_file ofam, get_witnesses ofam, get_fevents ofam)
   in
+  let (_: istr) = oorigin in
   let (oarr, ofather, omother) =
     let ocpl = foi base fi in
     (get_parent_array ocpl, get_father ocpl, get_mother ocpl)
