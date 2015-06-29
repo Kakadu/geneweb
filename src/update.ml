@@ -1080,7 +1080,8 @@ value add_misc_names_for_new_persons base new_persons =
     new_persons
 ;
 
-value insert_person conf base src new_persons (f, s, o, create, var) =
+value insert_person conf base src new_persons ((f, s, o, create, var) as key) =
+  let () = Printf.printf "insert_person. key = %s\n%!" (string_of_key key) in
   let f = if f = "" then "?" else f in
   let s = if s = "" then "?" else s in
   match create with

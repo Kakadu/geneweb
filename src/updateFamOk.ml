@@ -723,7 +723,7 @@ value check_parents conf base cpl =
 
 value check_family conf base fam cpl =
   let () = Printf.printf "check_family\n%!" in
-  (* N'est plus nécessaire avec les évènements. Est fait dans fevents. *)
+  (* Not necessary to deal with event. It's done in fevents. *)
   (*let err_witness = check_witnesses conf base fam in*)
   let err_parents = check_parents conf base cpl in
   let err_fevent_witness =
@@ -1214,7 +1214,7 @@ value update_family_with_fevents conf base fam =
 ;
 
 value effective_mod conf base sfam scpl sdes = do {
-  printf "effective_mod\n%!";
+  printf "UpdateFamOK.effective_mod\n%!";
   let fi = sfam.fam_index in
   let (oorigin, owitnesses, ofevents) =
     let ofam = foi base fi in
@@ -1232,14 +1232,17 @@ value effective_mod conf base sfam scpl sdes = do {
     [ Some s -> strip_spaces s
     | None -> "" ]
   in
+  printf "updateing couple\n";
   let ncpl =
     map_couple_p conf.multi_parents
       (Update.insert_person conf base psrc created_p) scpl
   in
+  printf "updateing family\n";
   let nfam =
     map_family_ps (Update.insert_person conf base psrc created_p)
       (Gwdb.insert_string base) sfam
   in
+  printf "updateing descendants\n";
   let ndes =
     map_descend_p (Update.insert_person conf base psrc created_p) sdes
   in
@@ -1358,8 +1361,24 @@ value effective_mod conf base sfam scpl sdes = do {
   (fi, nfam, ncpl, ndes)
 };
 
-value effective_add conf base sfam scpl sdes =
-  let () = Printf.printf "UpdateFamOK.effective_add\n%!" in
+value string_of_gen_descend f gd =
+  let b = Buffer.create 10 in
+  do {
+    Buffer.add_string b "[| ";
+    Array.iter (fun p -> Buffer.add_string b (f p)) gd.children;
+    Buffer.add_string b " |]";
+    Buffer.contents b
+  }
+;
+
+value effective_add: config -> base ->
+                     _ ->
+                     _ ->
+                     gen_descend Update.key ->
+                     (_ * _ * _ * _)
+= fun conf base sfam scpl sdes ->
+  let () = printf "UpdateFamOK.effective_add\n%!" in
+  let () = printf "sdes = %s\n%!" (string_of_gen_descend Update.string_of_key sdes) in
   let fi = Adef.ifam_of_int (nb_of_families base) in
   let created_p = ref [] in
   let psrc =
@@ -1839,7 +1858,12 @@ value print_add o_conf base =
     let () = Printf.printf "print_add\n%!" in
     let (sfam, scpl, sdes, ext) = reconstitute_family conf base in
     let (_: Def.gen_family (string * string * int * Update.create * string) string) = sfam in
+    let (_: gen_couple (string * string * int * Update.create * string)) = scpl in
 
+    let () =
+      printf "gen_couple.father: key = %s\n%!" (Update.string_of_key (Adef.father scpl)) in
+    let () =
+      printf "gen_couple.mother: key = %s\n%!" (Update.string_of_key (Adef.mother scpl)) in
     let redisp =
       match p_getenv conf.env "return" with
       [ Some _ -> True

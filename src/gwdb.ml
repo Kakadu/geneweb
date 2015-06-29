@@ -1205,7 +1205,9 @@ value base1 base =
      patch_name s ip = base.func.Dbdisk.patch_name s ip;
      patch_key ip fn sn occ = ();
      delete_key fn sn occ = ();
-     insert_string s = Istr (base.func.Dbdisk.insert_string s);
+     insert_string s =
+       let () = if s<>"" then printf "base.insert_string '%s'\n%!" s else () in
+       Istr (base.func.Dbdisk.insert_string s);
      commit_patches = base.func.Dbdisk.commit_patches;
      commit_notes = base.func.Dbdisk.commit_notes;
      is_patched_person ip = base.func.Dbdisk.is_patched_person ip;
