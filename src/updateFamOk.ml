@@ -1697,6 +1697,72 @@ value forbidden_disconnected conf sfam scpl sdes =
   else False
 ;
 
+value string_of_gen_family gf =
+  Printf.sprintf "{fam_index=%s;_}" (Adef.string_of_ifam gf.fam_index)
+;
+
+value effective_mod_merge_impl
+                         : (config -> base -> 'a -> unit) ->
+                           config -> base ->
+                           gen_family iper string ->
+                           gen_family iper string ->
+                           gen_family Update.key string ->
+                           gen_couple Update.key  ->
+                           gen_descend Update.key ->
+                           unit
+= fun cont conf base o_f1 o_f2 sfam scpl sdes ->
+
+  let () = printf "effective_mod_merge_impl\n" in
+  let () = printf "o_f1: %s\n%!" (string_of_gen_family o_f1) in
+  let () = printf "o_f2: %s\n%!" (string_of_gen_family o_f2) in
+  let () = printf "sfam: %s\n%!" (string_of_gen_family sfam) in
+
+  let ifam2 = o_f2.fam_index in
+  let fam2: Gwdb.family = foi base ifam2 in
+  do {
+    effective_del conf base (ifam2, fam2);
+    (* We are going to merge two families and remote 2nd one instantly. Is it weird? *)
+    let (ifam, fam, cpl, des) = effective_mod conf base sfam scpl sdes in
+    let wl =
+      all_checks_family conf base ifam fam cpl des
+         (scpl, sdes, None (* should be Some *))
+    in
+    Util.commit_patches conf base;
+    let () =
+      let s =
+        let sl = [fam.comment; fam.fsources; fam.marriage_note; fam.marriage_src] in
+        let sl : list istr =
+          loop (fam.fevents) sl where rec loop l accu =
+            match l with
+            [ [] -> accu
+            | [evt :: l] -> loop l [evt.efam_note; evt.efam_src :: accu] ]
+        in
+        String.concat " " (List.map (sou base) sl)
+      in
+      Notes.update_notes_links_db conf (NotesLinks.PgFam ifam) s
+    in
+    (* Prepare and record history item now *)
+    let changed =
+      let gen_p : gen_person iper string =
+        let p =
+          match p_getint conf.env "ip" with
+          [ Some i ->
+              let ip = Adef.iper_of_int i in
+              if Adef.mother cpl = ip then poi base (Adef.mother cpl)
+              else poi base (Adef.father cpl)
+          | None -> poi base (Adef.father cpl) ]
+        in
+        Util.string_gen_person base (gen_person_of_person p)
+      in
+      let n_f = Util.string_gen_family base fam in
+      U_Merge_family gen_p o_f1 o_f2 n_f
+    in
+    History.record conf base changed "ff";
+
+    cont conf base (wl, cpl, des);
+}
+;
+
 value fix_family conf base sfam scpl =
   let () = printf "fix_family\n%!" in
   let (_: Def.gen_family Update.key string) = sfam in
@@ -1736,7 +1802,27 @@ value fix_family conf base sfam scpl =
                       ) ffamilies
         in
         let () = printf "Found %d families to merge\n%!" (List.length families_to_merge) in
-        (* TODO: call MergeFamOk.effective_mod_merge somehow *)
+
+(*         let () = *)
+(*           match families_to_merge with *)
+(*             [ [a; b] -> *)
+(*               effective_mod_merge_impl (fun _ _ _ -> ()) conf base *)
+(* (\* *)
+(*                            gen_family iper string -> *)
+(*                            gen_family iper string -> *)
+(*                            gen_family Update.key string -> *)
+(*                            gen_couple Update.key  -> *)
+(*                            gen_descend Update.key -> *)
+(* *\) *)
+
+(*                                        (Obj.magic()) *)
+(*                                        (Obj.magic()) *)
+(*                                        (Obj.magic()) *)
+(*                                        (Obj.magic()) *)
+(*                                        (Obj.magic()) *)
+(*             | _ -> printf "do not merge\n%!" *)
+(*             ] *)
+(*         in *)
         ()
       | _ -> printf "can't get father of mother from DB\n%!"
       ]
@@ -1816,6 +1902,7 @@ value print_add o_conf base =
           History.record conf base changed act;
           Update.delete_topological_sort conf base;
           fix_family conf base sfam scpl;
+
           print_add_ok conf base (wl, ml) cpl des
         } ]
   with
@@ -1855,7 +1942,12 @@ value print_del conf base =
   | _ -> incorrect_request conf ]
 ;
 
-value print_mod_aux conf base callback =
+value print_mod_aux
+  : config -> base ->
+    (gen_family Update.key string ->
+     gen_couple Update.key -> gen_descend Update.key -> unit) ->
+    unit
+= fun conf base callback ->
   try
     let (sfam, scpl, sdes, ext) = reconstitute_family conf base in
     let redisp =

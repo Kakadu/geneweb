@@ -743,6 +743,12 @@ and family2_dat =
     des2 : mutable option (option (gen_descend iper)) }
 ;
 
+value string_of_family = fun
+  [ Family  _ n _ -> sprintf "Family(_,%d,_)" n
+  | Family2 _ n _ -> sprintf "Family(_,%d,_)" n
+  ]
+;
+
 type family_fun 'f 'c 'd =
   { get_comment : 'f -> istr;
     get_divorce : 'f -> Def.divorce;
