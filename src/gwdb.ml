@@ -1195,13 +1195,20 @@ value base1 base =
      patch_person ip p =
        let p = map_person_ps (fun p -> p) un_istr p in
        base.func.Dbdisk.patch_person ip p;
-     patch_ascend ip a = base.func.Dbdisk.patch_ascend ip a;
-     patch_union ip u = base.func.Dbdisk.patch_union ip u;
+     patch_ascend ip a =
+       let () = printf "patch_ascend ip=%s\n%!" (Adef.string_of_iper ip) in
+       base.func.Dbdisk.patch_ascend ip a;
+     patch_union ip u =
+       let () = printf "Gwdb.patch_union iper=%s\n%!" (Adef.string_of_iper ip) in
+       base.func.Dbdisk.patch_union ip u;
      patch_family ifam f =
+       let () = printf "Gwdb.patch_family ifam=%s\n%!" (Adef.string_of_ifam ifam) in
        let f = map_family_ps (fun p -> p) un_istr f in
        base.func.Dbdisk.patch_family ifam f;
      patch_descend ifam d = base.func.Dbdisk.patch_descend ifam d;
-     patch_couple ifam c = base.func.Dbdisk.patch_couple ifam c;
+     patch_couple ifam c =
+       let () = printf "Gwdb.patch_couple ifam=%s\n%!" (Adef.string_of_ifam ifam) in
+       base.func.Dbdisk.patch_couple ifam c;
      patch_name s ip = base.func.Dbdisk.patch_name s ip;
      patch_key ip fn sn occ = ();
      delete_key fn sn occ = ();

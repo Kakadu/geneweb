@@ -23,6 +23,7 @@ value string_of_key: key -> string;
 value infer_death : config -> option date -> option date -> death;
 value print_same_name : config -> base -> person -> unit;
 
+(* shows conflict description page if can't add *)
 value insert_person :
   config -> base -> string -> ref (list (gen_person iper istr)) -> key ->
     Adef.iper

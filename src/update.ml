@@ -8,6 +8,7 @@ open Gutil;
 open Gwdb;
 open Hutil;
 open Util;
+open Printf;
 
 exception ModErr;
 type create_info =
@@ -158,6 +159,7 @@ value print_err_unknown conf base (f, s, o) =
 ;
 
 value update_misc_names_of_family base p_sex u =
+  let () = printf "update_misc_names_of_family\n%!" in
   match p_sex with
   [ Male ->
       List.iter
@@ -1073,6 +1075,7 @@ value print_create_conflict conf base p var =
 ;
 
 value add_misc_names_for_new_persons base new_persons =
+  let () = printf "add_misc_names_for_new_persons\n%!" in
   List.iter
     (fun p ->
        List.iter (fun n -> person_ht_add base n p.key_index)

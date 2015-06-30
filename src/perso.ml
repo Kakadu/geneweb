@@ -3592,7 +3592,7 @@ value print_foreach conf base print_ast eval_expr =
     try int_of_string s with [ Failure _ -> raise Not_found ]
   in
   let rec print_foreach env ini_ep loc s sl ell al =
-    let () = print_endline "print_foreach" in
+    (* let () = print_endline "print_foreach" in *)
     let rec loop ((a, _) as ep) efam =
       fun
       [ [s] -> print_simple_foreach env ell al ini_ep ep efam loc s
@@ -3662,7 +3662,7 @@ value print_foreach conf base print_ast eval_expr =
     let efam = get_env "fam" env in
     loop ini_ep efam [s :: sl]
   and print_simple_foreach env el al ini_ep ep efam loc =
-    let () = print_endline "print_simple_foreach" in
+    (* let () = print_endline "print_simple_foreach" in *)
     fun
     [ "alias" -> print_foreach_alias env al ep
     | "ancestor" -> print_foreach_ancestor env al ep
