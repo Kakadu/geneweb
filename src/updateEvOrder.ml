@@ -1,7 +1,16 @@
 open TemplAst;
 
+value bool_val x = VVbool x;
+value str_val x = VVstring x;
+
+type env 'a =
+  [ Vbool of bool
+  | Vstring of string
+  | Vother of 'a
+  ]
+;
 value eval_var conf base _env _ _loc xs =
-  VVbool False
+  bool_val (False)
 ;
 
 value get_vother = fun [ Vother x -> Some x | _ -> None ];
@@ -12,8 +21,8 @@ value print_foreach conf base  print_ast eval_expr _ _loc xs s ss ass _as =
 ;
 
 value print_forum_message conf base =
-  let env  = [ ("xxx", VVstring "asdf") ] in
-  Hutil.interp conf base "forum"
+  let env  = [ ("xxx", Vstring "asdf") ] in
+  Hutil.interp conf base "eventsorder"
     {Templ.eval_var = eval_var conf base;
      Templ.eval_transl _ = Templ.eval_transl conf;
      Templ.eval_predefined_apply _ = raise Not_found;
