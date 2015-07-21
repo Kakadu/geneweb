@@ -8,6 +8,7 @@ open Gutil;
 open Gwdb;
 open Hutil;
 open Util;
+open Printf;
 
 value person_is_std_key conf base p k =
   let k = Name.strip_lower k in
@@ -378,6 +379,7 @@ value make_senv conf base =
 value updmenu_print = Perso.interp_templ "updmenu";
 
 value family_m conf base =
+  let () = Printf.printf "Request.ml: family_m\n%!" in
   match p_getenv conf.env "m" with
   [ Some "A" ->
       match find_person_in_env conf base "" with
@@ -494,6 +496,7 @@ value family_m conf base =
   | Some "LEX" -> Srcfile.print_lexicon conf base
   | Some "MISC_NOTES" -> Notes.print_misc_notes conf base
   | Some "MISC_NOTES_SEARCH" -> Notes.print_misc_notes_search conf base
+  | Some "MOD_EVENT_ORDER" when conf.wizard -> UpdateEvOrder.print_mod conf base
   | Some "MOD_DATA" when conf.wizard -> UpdateData.print_mod conf base
   | Some "MOD_DATA_OK" when conf.wizard -> UpdateData.print_mod_ok conf base
   | Some "MOD_FAM" when conf.wizard -> UpdateFam.print_mod conf base
@@ -788,6 +791,7 @@ value trace_keys base (fn, sn, occ) ipo = do {
 };
 
 value treat_request conf base log = do {
+  printf "treat_request\n%!";
   match
     (p_getenv conf.base_env "moved",
      p_getenv conf.env "opt",
