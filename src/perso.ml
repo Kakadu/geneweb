@@ -2875,7 +2875,7 @@ and eval_bool_person_field conf base env (p, p_auth) =
             else loop events ]
   | "has_event" ->
       if p_auth then
-        match p_getenv conf.env "display_timeline" with
+        match p_getenv conf.base_env "display_timeline" with
         [ Some "no" -> False
         | Some "yes" -> True
         | _ ->
