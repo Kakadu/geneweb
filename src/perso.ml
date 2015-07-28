@@ -4501,6 +4501,10 @@ value print conf base (p: Gwdb.person) =
       interp_templ "perso" conf base p ]
 ;
 
+value print_events_mod_list conf base p =
+  interp_templ "eventsorder" conf base p
+;
+
 value limit_by_tree conf =
   match p_getint conf.base_env "max_anc_tree" with
   [ Some x -> max 1 x

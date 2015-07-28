@@ -1,18 +1,35 @@
-    %if;has_birth_date;
-      <li>%apply;capitalize(nth([born],sex)) %on_birth_date;
-      %if;birthday; ([happy birthday to you!])%end;
-      %if;has_birth_place; - %birth_place;%end;</li>%nl;
-      %if;computable_age;<li>[*age] : %age;</li>%end;
-    %else;
-      %if;has_birth_place;
-        <li>%apply;capitalize(nth([born],sex)) - %birth_place;</li>%nl;
-      %end;
+  <h3 class="highlight">[*time line] </h3>
+  <table>
+    %foreach;event;
+      <tr>
+        <td valign="top" style="white-space: nowrap;" width="1">
+          <span class="edate">
+            %if;event.has_date;%event.date; :
+            %else;--- :
+            %end;
+          </span>
+        </td>
+        <td valign="top">
+          <span>
+            %apply;capitalize(event.name)%sp;
+            %if;event.has_spouse;([with] %event.spouse;)%end;
+            %if;event.has_place; - %event.place;%end;
+          </span>
+          %if;event.has_witnesses;
+            <p style="margin:0;">
+              %foreach;event_witness;
+                <span>%apply;capitalize(event_witness_kind) :</span>
+                %apply;short_display_person("event_witness")<br/>
+              %end;
+            </p>
+          %end;
+          %if;event.has_note;
+            <div>%event.note;</div>
+          %end;
+          %if;event.has_src;
+            <span><em>[*source/sources]1: %event.src;</em></span>
+          %end;
+        </td>
+      </tr>
     %end;
-    %if;has_baptism_date;
-      <li>%apply;capitalize(nth([baptized],sex)) %on_baptism_date;
-      %if;has_baptism_place; - %baptism_place;%end;</li>%nl;
-    %else;
-      %if;has_baptism_place;
-        <li>%apply;capitalize(nth([baptized],sex)) - %baptism_place;</li>%nl;
-      %end;
-    %end;
+  </table>
