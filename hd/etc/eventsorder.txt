@@ -1,3 +1,32 @@
+%doctype;
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <!-- $Id: perso.txt,v 5.15 2007-07-25 15:01:02 ddr Exp $ -->
+  <!-- Copyright (c) 1998-2007 INRIA -->
+  <title>%nn;
+    %if;has_public_name;
+      %if;has_qualifiers;%public_name; %qualifier;
+      %else;%public_name; %surname;%end;
+    %else;
+      %if;has_qualifiers;%first_name; %qualifier;
+      %else;%first_name; %surname;%end;
+    %end;
+  </title>
+  <meta http-equiv="Content-Style-Type" content="text/css"%/>
+  <meta http-equiv="Content-Type" content="text/html; charset=%charset;"%/>
+  <meta name="robots" content="none"%/>
+  <link rel="shortcut icon" href="%image_prefix;/favicon_gwd.png"%/>
+  %include.js;
+  %include.css;
+  %base_header;
+</head>
+<body%body_prop;>
+%message_to_wizard;
+
+%( Because Safari mobile is just a great browser that can't handle events... %)
+%( Added a div with an 'empty event' to handle the modify menu.              %)
+<div onclick="void(0);">
+
   <h3 class="highlight">[*time line] </h3>
   <table>
     %foreach;event;
@@ -13,16 +42,10 @@
           <span>
             %apply;capitalize(event.name)%sp;
             %if;event.has_spouse;([with] %event.spouse;)%end;
-            %if;event.has_place; - %event.place;%end;
+            <!-- %if;event.has_place; - %event.place;%end; -->
+            %event.pos;
           </span>
-          %if;event.has_witnesses;
-            <p style="margin:0;">
-              %foreach;event_witness;
-                <span>%apply;capitalize(event_witness_kind) :</span>
-                %apply;short_display_person("event_witness")<br/>
-              %end;
-            </p>
-          %end;
+
           %if;event.has_note;
             <div>%event.note;</div>
           %end;
@@ -33,3 +56,10 @@
       </tr>
     %end;
   </table>
+
+%base_trailer;
+%copyright;
+
+</div> %( the magic Safari div %)
+</body>
+</html>

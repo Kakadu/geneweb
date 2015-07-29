@@ -2677,6 +2677,10 @@ and eval_str_event_field
         in
         string_with_macros conf env src
       else ""
+  | "pos" ->
+     match get_env "pos" env with
+       [ Vint n -> string_of_int n
+       | _ -> raise Not_found ]
   | _ -> raise Not_found ]
 and eval_event_field_var
       conf base env (p, p_auth) (name, date, place, note, src, w, isp) loc =
@@ -3968,10 +3972,11 @@ value print_foreach conf base print_ast eval_expr =
         }
   and print_foreach_event env al ((p, p_auth) as ep) =
     let events = events_list conf base p in
-    list_iter_first
-      (fun first evt ->
+    list_iteri_first
+      (fun first pos evt ->
          let env = [("event", Vevent p evt) :: env] in
          let env = [("first", Vbool first) :: env] in
+         let env = [("pos", Vint pos) :: env] in
          List.iter (print_ast env ep) al)
       events
   and print_foreach_event_witness env al ((p, p_auth) as ep) =
