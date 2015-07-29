@@ -23,6 +23,28 @@
 <body%body_prop;>
 %message_to_wizard;
 
+<script type="text/javascript">
+function update_href() {
+  var new_order = $.map( $("table tr"), function (x) { return $(x).attr('oldpos'); } ).join(",");
+  $(".submit_form").attr( "href", "%prefix;m=MOD_EVENT_ORDER_OK;v=" + new_order);
+}
+
+function on_move_down(x) {
+  var $tr = x.parent();
+  var curpos = $("table tr").index($tr);
+  $tr.next("tr").after($tr);
+
+  update_href();
+}
+function on_move_up(x) {
+  var $tr = x.parent();
+  var curpos = $("table tr").index($tr);
+  $tr.prev("tr").before($tr);
+
+  update_href();
+}
+</script>
+
 %( Because Safari mobile is just a great browser that can't handle events... %)
 %( Added a div with an 'empty event' to handle the modify menu.              %)
 <div onclick="void(0);">
@@ -30,7 +52,10 @@
   <h3 class="highlight">[*time line] </h3>
   <table>
     %foreach;event;
-      <tr>
+      <tr oldpos=%event.pos;>
+        <td onclick="on_move_up($(this));">Move up</td>
+        <td onclick="on_move_down($(this));">Move down</td>
+
         <td valign="top" style="white-space: nowrap;" width="1">
           <span class="edate">
             %if;event.has_date;%event.date; :
@@ -56,6 +81,8 @@
       </tr>
     %end;
   </table>
+
+  <a class="submit_form" href="">Apply changes</a>
 
 %base_trailer;
 %copyright;
