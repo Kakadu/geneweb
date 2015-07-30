@@ -500,6 +500,7 @@ value family_m conf base =
       match find_person_in_env conf base "" with
       [ Some p -> Perso.print_events_mod_list conf base p
       | _ -> very_unknown conf ]
+  | Some "MOD_EVENT_ORDER_OK"  -> UpdateEventOrderOk.print_mod conf base
 
   | Some "MOD_DATA" when conf.wizard -> UpdateData.print_mod conf base
   | Some "MOD_DATA_OK" when conf.wizard -> UpdateData.print_mod_ok conf base
