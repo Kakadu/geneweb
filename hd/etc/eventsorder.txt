@@ -51,7 +51,7 @@ function on_move_up(x) {
 
   <h3 class="highlight">[*time line] </h3>
   <table>
-    %foreach;event;
+    %foreach;pevent;
       <tr oldpos=%event.pos;>
         <td onclick="on_move_up($(this));">Move up</td>
         <td onclick="on_move_down($(this));">Move down</td>
@@ -88,5 +88,9 @@ function on_move_up(x) {
 %copyright;
 
 </div> %( the magic Safari div %)
+<script type="text/javascript">
+update_href();
+</script>
+
 </body>
 </html>

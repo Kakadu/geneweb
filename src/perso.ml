@@ -1584,6 +1584,23 @@ value get_sosa conf base env r p =
     } ]
 ;
 
+value pevents_list conf base p =
+    if authorized_age conf base p then
+      (* On conserve l'ordre de tri. *)
+      List.fold_right
+        (fun evt events ->
+           let name = Pevent evt.epers_name in
+           let date = evt.epers_date in
+           let place = evt.epers_place in
+           let note = evt.epers_note in
+           let src = evt.epers_src in
+           let wl = evt.epers_witnesses in
+           let x = (name, date, place, note, src, wl, None) in
+           [x :: events] )
+        (get_pevents p) []
+    else []
+;
+
 value events_list conf base p =
   let pevents =
     if authorized_age conf base p then
@@ -3684,6 +3701,7 @@ value print_foreach conf base print_ast eval_expr =
     | "death_witness" -> print_foreach_death_witness env al ep
     | "descendant_level" -> print_foreach_descendant_level env al ep
     | "event" -> print_foreach_event env al ep
+    | "pevent" -> print_foreach_pevent env al ep
     | "event_witness" -> print_foreach_event_witness env al ep
     | "event_witness_relation" ->
         print_foreach_event_witness_relation env al ep
@@ -3972,6 +3990,15 @@ value print_foreach conf base print_ast eval_expr =
         }
   and print_foreach_event env al ((p, p_auth) as ep) =
     let events = events_list conf base p in
+    list_iteri_first
+      (fun first pos evt ->
+         let env = [("event", Vevent p evt) :: env] in
+         let env = [("first", Vbool first) :: env] in
+         let env = [("pos", Vint pos) :: env] in
+         List.iter (print_ast env ep) al)
+      events
+  and print_foreach_pevent env al ((p, p_auth) as ep) =
+    let events = pevents_list conf base p in
     list_iteri_first
       (fun first pos evt ->
          let env = [("event", Vevent p evt) :: env] in

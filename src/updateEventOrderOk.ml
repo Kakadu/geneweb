@@ -6,6 +6,7 @@ open Gwdb;
 open Hutil;
 open Mutil;
 open Util;
+open Printf;
 
 value print_reorder_ok conf base =
   let title _ = Wserver.wprint "%s" (capitale (transl conf "person added")) in
@@ -31,7 +32,10 @@ value print_reorder_ok conf base =
   }
 ;
 
-value verify_permutation len xs =
+value verify_permutation xs =
+  let len = List.length xs in
+  let () = printf "Verify that int permutation '%s' is permutation of numbers from 0 to %d\n"
+                  (String.concat "," (List.map string_of_int xs)) (len-1) in
   True
 ;
 
@@ -39,7 +43,7 @@ value print_mod conf base =
   let () = print_endline "Changing order is not implement" in
   let p =
     match p_getint conf.env "i" with
-    [ Some ip -> Some (poi base (Adef.iper_of_int ip))
+    [ Some ip -> Some (ip, gen_person_of_person (poi base (Adef.iper_of_int ip)) )
     | None -> None ]
   in
 
@@ -50,7 +54,11 @@ value print_mod conf base =
     | None -> None ]
   in
   (* TODO: more checks for parameters *)
+  (* TODO: check for authorization *)
   match (p,order) with
-  [ (Some p, Some order) -> print_reorder_ok conf base
+  [ (Some (iper,p), Some order) when verify_permutation order ->
+    let events = get_pevents (poi base (Adef.iper_of_int iper)) in
+
+    print_reorder_ok conf base
   |  _ ->          Wserver.wprint "<h3 class=\"error\">"  ]
 ;
