@@ -67,8 +67,6 @@ function on_move_up(x) {
           <span>
             %apply;capitalize(event.name)%sp;
             %if;event.has_spouse;([with] %event.spouse;)%end;
-            <!-- %if;event.has_place; - %event.place;%end; -->
-            %event.pos;
           </span>
 
           %if;event.has_note;

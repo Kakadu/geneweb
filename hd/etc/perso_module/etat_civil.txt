@@ -63,5 +63,4 @@
   %if;has_image;
     </td></tr></table>
   %end;
-  <a href="%prefix;m=MOD_EVENT_ORDER;i=%index;">Edit order</a><br>
 %end;
