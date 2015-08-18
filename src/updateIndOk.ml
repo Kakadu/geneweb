@@ -10,6 +10,7 @@ open Gwdb;
 open Hutil;
 open Mutil;
 open Util;
+open Printf;
 
 (* Liste des string dont on a supprimé un caractère.       *)
 (* Utilisé pour le message d'erreur lors de la validation. *)
@@ -439,12 +440,13 @@ value reconstitute_burial conf burial_place =
 
 value reconstitute_from_pevents pevents ext bi bp de bu =
   (* On tri les évènements pour être sûr. *)
-  let pevents =
-    CheckItem.sort_events
-      ((fun evt -> CheckItem.Psort evt.epers_name),
-       (fun evt -> evt.epers_date))
-      pevents
-  in
+  let () = Printf.printf "sorting events skipped\n" in
+  (* let pevents = *)
+  (*   CheckItem.sort_events *)
+  (*     ((fun evt -> CheckItem.Psort evt.epers_name), *)
+  (*      (fun evt -> evt.epers_date)) *)
+  (*     pevents *)
+  (* in *)
   let found_birth = ref False in
   let found_baptism = ref False in
   let found_death = ref False in
@@ -580,7 +582,68 @@ value reconstitute_from_pevents pevents ext bi bp de bu =
   (bi, bp, de, bu, pevents)
 ;
 
-value reconstitute_person conf =
+
+value string_of_pevent_name f e : string =
+  match e with
+  [ Epers_Name s -> f s
+  | Epers_Birth -> "Epers_Birth"
+  | Epers_Baptism -> "Epers_Baptism"
+  | Epers_Death -> "Epers_Death"
+  | Epers_Burial -> "Epers_Burial"
+  | Epers_Cremation -> "Epers_Cremation"
+  | Epers_Accomplishment -> "Epers_Accomplishment"
+  | Epers_Acquisition -> "Epers_Acquisition"
+  | Epers_Adhesion -> "Epers_Adhesion"
+  | Epers_BaptismLDS -> "Epers_BaptismLDS"
+  | Epers_BarMitzvah -> "Epers_BarMitzvah"
+  | Epers_BatMitzvah -> "Epers_BatMitzvah"
+  | Epers_Benediction -> "Epers_Benediction"
+  | Epers_ChangeName -> "Epers_ChangeName"
+  | Epers_Circumcision -> "Epers_Circumcision"
+  | Epers_Confirmation -> "Epers_Confirmation"
+  | Epers_ConfirmationLDS -> "Epers_ConfirmationLDS"
+  | Epers_Decoration -> "Epers_Decoration"
+  | Epers_DemobilisationMilitaire -> "Epers_DemobilisationMilitaire"
+  | Epers_Diploma -> "Epers_Diploma"
+  | Epers_Distinction -> "Epers_Distinction"
+  | Epers_Dotation -> "Epers_Dotation"
+  | Epers_DotationLDS -> "Epers_DotationLDS"
+  | Epers_Education -> "Epers_Education"
+  | Epers_Election -> "Epers_Election"
+  | Epers_Emigration -> "Epers_Emigration"
+  | Epers_Excommunication -> "Epers_Excommunication"
+  | Epers_FamilyLinkLDS -> "Epers_FamilyLinkLDS"
+  | Epers_FirstCommunion -> "Epers_FirstCommunion"
+  | Epers_Funeral -> "Epers_Funeral"
+  | Epers_Graduate -> "Epers_Graduate"
+  | Epers_Hospitalisation -> "Epers_Hospitalisation"
+  | Epers_Illness -> "Epers_Illness"
+  | Epers_Immigration -> "Epers_Immigration"
+  | Epers_ListePassenger -> "Epers_ListePassenger"
+  | Epers_MilitaryDistinction -> "Epers_MilitaryDistinction"
+  | Epers_MilitaryPromotion -> "Epers_MilitaryPromotion"
+  | Epers_MilitaryService -> "Epers_MilitaryService"
+  | Epers_MobilisationMilitaire -> "Epers_MobilisationMilitaire"
+  | Epers_Naturalisation -> "Epers_Naturalisation"
+  | Epers_Occupation -> "Epers_Occupation"
+  | Epers_Ordination -> "Epers_Ordination"
+  | Epers_Property -> "Epers_Property"
+  | Epers_Recensement -> "Epers_Recensement"
+  | Epers_Residence -> "Epers_Residence"
+  | Epers_Retired -> "Epers_Retired"
+  | Epers_ScellentChildLDS -> "Epers_ScellentChildLDS"
+  | Epers_ScellentParentLDS -> "Epers_ScellentParentLDS"
+  | Epers_ScellentSpouseLDS -> "Epers_ScellentSpouseLDS"
+  | Epers_VenteBien -> "Epers_VenteBien"
+  | Epers_Will -> "Epers_Will"
+  ]
+;
+
+value string_of_pevent f e =
+  string_of_pevent_name f e.epers_name
+;
+
+value reconstitute_person base conf =
   let ext = False in
   let key_index =
     match p_getenv conf.env "i" with
@@ -669,6 +732,8 @@ value reconstitute_person conf =
     | _ -> death ]
   in
   let (pevents, ext) = reconstitute_pevents conf ext 1 in
+  let () = List.iter (fun e -> print_endline (string_of_pevent (fun x -> x) e) ) pevents in
+
   let (pevents, ext) = reconstitute_insert_pevent conf ext 0 pevents in
   let notes =
     if first_name = "?" || surname = "?" then ""
@@ -1281,7 +1346,7 @@ value print_add o_conf base =
   let () = removed_string.val := [] in
   let conf = Update.update_conf o_conf in
   try
-    let (sp, ext) = reconstitute_person conf in
+    let (sp, ext) = reconstitute_person base conf in
     let redisp =
       match p_getenv conf.env "return" with
       [ Some _ -> True
@@ -1333,7 +1398,7 @@ value print_del conf base =
 
 value print_mod_aux conf base callback =
   try
-    let (p, ext) = reconstitute_person conf in
+    let (p, ext) = reconstitute_person base conf in
     let redisp =
       match p_getenv conf.env "return" with
       [ Some _ -> True
@@ -1374,6 +1439,13 @@ value print_mod o_conf base =
     let p = effective_mod conf base sp in
     let op = poi base p.key_index in
     let u = {family = get_family op} in
+    let () = do {
+      printf "patching person with new person with %d pevents\n" (List.length p.pevents);
+      List.iter (fun e -> print_endline (string_of_pevent (sou base) e)) p.pevents;
+      let old = gen_person_of_person (poi base p.key_index) in
+      printf "old person has %d pevents\n" (List.length old.pevents);
+      List.iter (fun e -> print_endline (string_of_pevent (sou base) e)) old.pevents;
+    } in
     patch_person base p.key_index p;
     let s =
       let sl =
