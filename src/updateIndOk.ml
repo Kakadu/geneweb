@@ -1278,9 +1278,8 @@ value print_del_ok conf base wl =
   }
 ;
 
-value fix_event_order conf base (gp: gen_person _ _) =
-
-  gp
+value merge_new_event es e =
+  [e :: es]
 ;
 
 value print_add o_conf base =
@@ -1301,7 +1300,8 @@ value print_add o_conf base =
       match check_person conf base sp with
       [ Some err -> error_person conf base sp err
       | None ->
-          let sp = fix_event_order conf base sp in
+          let sorted_pevents = List.fold_left merge_new_event [] sp.pevents in
+          let sp = { (sp) with pevents=sorted_pevents } in
           let (p, a) = effective_add conf base sp in
           let u = {family = get_family (poi base p.key_index)} in
           let wl = all_checks_person conf base p a u in
@@ -1363,6 +1363,29 @@ value print_mod_aux conf base callback =
   [ Update.ModErr -> () ]
 ;
 
+value fix_event_order conf base (gp: gen_person Update.key string) =
+  let mem: gen_pers_event Update.key string -> list (gen_pers_event iper istr) -> bool
+    = fun e es ->
+    False
+  in
+
+  let base_p = poi base gp.key_index in
+  let base_pevents = (gen_person_of_person base_p).pevents in
+  let () = Printf.printf "fix_event_order (%d new events) (%d old events)\n"
+                         (List.length gp.pevents)
+                         (List.length base_pevents)
+  in
+  let (new_events, not_modified) =
+    List.fold_left (fun (x,y) e ->
+                    if mem e base_pevents then (x,[e::y]) else ([e::x],y))
+                   ([],[])
+                   gp.pevents in
+  let not_modified = List.rev not_modified in
+  let ans = List.fold_left merge_new_event not_modified new_events in
+  { (gp) with pevents = ans }
+;
+
+
 value print_mod o_conf base =
   (* Attention ! On pense à remettre les compteurs à *)
   (* zéro pour la détection des caractères interdits *)
@@ -1380,6 +1403,7 @@ value print_mod o_conf base =
   in
   let conf = Update.update_conf o_conf in
   let callback sp = do {
+    let sp = fix_event_order conf base sp in
     let p = effective_mod conf base sp in
     let op = poi base p.key_index in
     let u = {family = get_family op} in
