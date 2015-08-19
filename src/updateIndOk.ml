@@ -1206,7 +1206,9 @@ value relation_sex_is_coherent base warning p =
     p.rparents
 ;
 
-value all_checks_person conf base p a u = do {
+value all_checks_person : config -> base ->
+  gen_person iper istr -> gen_ascend ifam ->  gen_union ifam -> list CheckItem.base_warning
+= fun conf base p a u ->
   let wl = ref [] in
   let error = Update.error conf base in
   let warning w = wl.val := [w :: wl.val] in
@@ -1214,6 +1216,7 @@ value all_checks_person conf base p a u = do {
     let p = person_of_gen_person base (p, a, u) in
     CheckItem.person base warning p
   in
+  do {
   relation_sex_is_coherent base warning p;
   match a.parents with
   [ Some ifam -> CheckItem.reduce_family base error warning ifam (foi base ifam)
@@ -1225,8 +1228,8 @@ value all_checks_person conf base p a u = do {
     (fun
      [ ChangedOrderOfChildren ifam des _ after ->
          patch_descend base ifam {children = after}
-     | ChangedOrderOfPersonEvents _ _ after ->
-         patch_person base p.key_index {(p) with pevents = after}
+     (* | ChangedOrderOfPersonEvents _ _ after -> *)
+     (*     patch_person base p.key_index {(p) with pevents = after} *)
      | _ -> () ])
     wl.val;
   List.rev wl.val
@@ -1275,6 +1278,11 @@ value print_del_ok conf base wl =
   }
 ;
 
+value fix_event_order conf base (gp: gen_person _ _) =
+
+  gp
+;
+
 value print_add o_conf base =
   (* Attention ! On pense à remettre les compteurs à *)
   (* zéro pour la détection des caractères interdits *)
@@ -1293,6 +1301,7 @@ value print_add o_conf base =
       match check_person conf base sp with
       [ Some err -> error_person conf base sp err
       | None ->
+          let sp = fix_event_order conf base sp in
           let (p, a) = effective_add conf base sp in
           let u = {family = get_family (poi base p.key_index)} in
           let wl = all_checks_person conf base p a u in

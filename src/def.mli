@@ -225,7 +225,7 @@ type warning 'person 'descend 'title 'pevent 'fevent =
   | ChangedOrderOfChildren of ifam and 'descend and array iper and array iper
   | ChangedOrderOfMarriages of 'person and array ifam and array ifam
   | ChangedOrderOfFamilyEvents of ifam and list 'fevent and list 'fevent
-  | ChangedOrderOfPersonEvents of 'person and list 'pevent and list 'pevent
+  (* | ChangedOrderOfPersonEvents of 'person and list 'pevent and list 'pevent *)
   | ChildrenNotInOrder of ifam and 'descend and 'person and 'person
   | CloseChildren of ifam and 'descend and 'person and 'person
   | DeadOld of 'person and dmy
