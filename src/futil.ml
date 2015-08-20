@@ -84,6 +84,7 @@ value map_relation_ps fp fs r =
 ;
 
 value map_person_ps fp fs p =
+  let () = Printf.printf "map_person_ps, pevent count = %d\n" (List.length p.pevents) in
   {first_name = fs p.first_name; surname = fs p.surname; occ = p.occ;
    image = fs p.image;
    first_names_aliases = List.map fs p.first_names_aliases;

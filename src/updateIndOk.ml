@@ -1364,13 +1364,30 @@ value print_mod_aux conf base callback =
 ;
 
 value fix_event_order conf base (gp: gen_person Update.key string) =
-  let mem: gen_pers_event Update.key string -> list (gen_pers_event iper istr) -> bool
+  let base_p = poi base gp.key_index in
+  let base_pevents = (gen_person_of_person base_p).pevents in
+  let base_pevents : list (gen_pers_event iper string) =
+    List.map (Futil.map_pers_event (fun x -> x) (sou base)) base_pevents in
+
+  let key_of_person iper =
+    let gp = gen_person_of_person (poi base iper) in
+    let fname = sou base (gp.first_name) in
+    let lname = sou base (gp.surname) in
+    (fname, lname, 0, Update.link, 0)
+  in
+
+  let base_pevents : list (gen_pers_event iper string) =
+    List.map (Futil.map_pers_event (key_of_person) (fun x -> x) (sou base)) base_pevents in
+
+  let mem: gen_pers_event Update.key string -> list (gen_pers_event iper string) -> bool
     = fun e es ->
+    (* helper es where helper es = *)
+    (*   match es with *)
+    (*     [ [] -> False *)
+    (*     | [ h::tl ] -> *)
     False
   in
 
-  let base_p = poi base gp.key_index in
-  let base_pevents = (gen_person_of_person base_p).pevents in
   let () = Printf.printf "fix_event_order (%d new events) (%d old events)\n"
                          (List.length gp.pevents)
                          (List.length base_pevents)
