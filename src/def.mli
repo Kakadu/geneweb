@@ -6,7 +6,6 @@ type choice 'a 'b = [ Left of 'a | Right of 'b ];
 type iper = Adef.iper;
 type ifam = Adef.ifam;
 
-type cdate = Adef.cdate;
 type codate = Adef.codate;
 
 type date = Adef.date ==
@@ -44,7 +43,7 @@ type death_reason =
 ;
 type death =
   [ NotDead
-  | Death of death_reason and cdate
+  | Death of death_reason and codate
   | DeadYoung
   | DeadDontKnowWhen
   | DontKnowIfDead
