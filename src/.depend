@@ -388,10 +388,15 @@ updateInd.cmx: adef.cmx calendar.cmx config.cmi def.cmi futil.cmx gwdb.cmx \
     hutil.cmx templ.cmx templAst.cmi update.cmx util.cmx perso.cmx \
     ../wserver/wserver.cmx updateInd.cmi
 updateInd.cmi: config.cmi def.cmi gwdb.cmi update.cmi
+
+stringTools.cmi: def.cmi
+stringTools.cmo: def.cmo stringTools.cmi
+stringTools.cmx: def.cmi stringTools.cmi
+
 updateIndOk.cmo: adef.cmi checkItem.cmi config.cmi def.cmi futil.cmi \
     gutil.cmi gwdb.cmi history.cmi hutil.cmi mutil.cmi name.cmi notes.cmi \
     notesLinks.cmi update.cmi updateInd.cmi util.cmi ../wserver/wserver.cmi \
-    updateIndOk.cmi
+    stringTools.cmo updateIndOk.cmi
 updateIndOk.cmx: adef.cmx checkItem.cmx config.cmi def.cmi futil.cmx \
     gutil.cmx gwdb.cmx history.cmx hutil.cmx mutil.cmx name.cmx notes.cmx \
     notesLinks.cmx update.cmx updateInd.cmx util.cmx ../wserver/wserver.cmx \

@@ -264,7 +264,7 @@ value sort_person_list base pl =
     pl
 ;
 
-value find_free_occ base f s i =
+value find_free_occ base f s _ =
   let ipl = persons_of_name base (f ^ " " ^ s) in
   let first_name = Name.lower f in
   let surname = Name.lower s in

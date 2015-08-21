@@ -10,6 +10,7 @@ open Gwdb;
 open Hutil;
 open Mutil;
 open Util;
+open Printf;
 
 (* Liste des string dont on a supprimé un caractère.       *)
 (* Utilisé pour le message d'erreur lors de la validation. *)
@@ -1278,8 +1279,52 @@ value print_del_ok conf base wl =
   }
 ;
 
-value merge_new_event: list (gen_pers_event Update.key string) -> gen_pers_event Update.key string -> _ = fun es e ->
-  [e :: es]
+value merge_new_event
+: list (gen_pers_event Update.key string) -> gen_pers_event Update.key string -> list _
+= fun es e ->
+  let rec insert_after_or_in_head cond e xs : list _ =
+    match xs with
+      [ [ x::xs ] when cond x -> [ x :: insert_after_or_in_head cond e xs ]
+                                   (* we will have max 2 events for skipping so
+                                      stack is not a problem for a while        *)
+      | _ -> [ e :: xs ]
+      ]
+  in
+  let rec insert_before_or_to_tail cond e xs =
+    List.rev (insert_after_or_in_head cond e (List.rev xs))
+    (* Not very good implementation but short *)
+  in
+  let snoc (x: gen_pers_event _ _) xs = List.rev [ x :: List.rev xs ] in
+
+  let is_dated_event e = None<>Adef.od_of_codate e.epers_date in
+  let undated = not (is_dated_event e) in
+  let () = printf "merge_new_event. has_date = %b\n" (not undated) in
+  (* let is_dated:  =  *)
+  (* let  *)
+  let is_burial_crem_death e =
+    List.mem e.epers_name [Epers_Burial; Epers_Cremation; Epers_Death]
+  in
+  match e with
+  [ _ when e.epers_name=Epers_Birth && undated -> [e::es]
+  | _ when e.epers_name=Epers_Baptism && undated ->
+     insert_after_or_in_head (fun e -> e.epers_name=Epers_Birth) e es
+  | _ when e.epers_name=Epers_Burial && undated    -> snoc e es
+  | _ when e.epers_name=Epers_Cremation && undated ->  snoc e es
+  | _ when e.epers_name=Epers_Death     && undated ->
+     insert_before_or_to_tail
+       (fun e -> e.epers_name=Epers_Burial || e.epers_name=Epers_Cremation) e es
+  | _ when undated ->
+     insert_before_or_to_tail is_burial_crem_death e es
+  | newe ->
+     (* Skip while new event is before current and before B/C/D *)
+     let newdate = Adef.date_of_cdate newe.epers_date in
+     let skip e = (e.epers_name=Epers_Birth) || (e.epers_name=Epers_Baptism) ||
+       not (is_burial_crem_death e) ||
+       not (is_dated_event e) ||
+       CheckItem.strictly_before newdate (Adef.date_of_cdate newe.epers_date)
+     in
+     insert_after_or_in_head skip newe es
+  ]
 ;
 
 value print_add o_conf base =
@@ -1402,6 +1447,12 @@ value fix_event_order conf base (gp: gen_person Update.key string) =
   let () = Printf.printf "New events: %d, not_modified: %d\n" (List.length new_events)
                          (List.length not_modified) in
   let ans = List.fold_left merge_new_event not_modified new_events in
+  let () = List.iter
+             (fun e -> print_endline
+                         (StringTools.string_of_pevent_name id e.epers_name) )
+             ans
+  in
+  let () = print_endline "===================\n" in
   { (gp) with pevents = ans }
 ;
 

@@ -5,7 +5,6 @@ type iper = 'a;
 type ifam = 'a;
 type istr = 'a;
 type fix = 'a;
-type codate = 'a;
 type gen_couple 'person = 'a;
 
 value string_of_ifam : ifam -> string;
@@ -34,12 +33,9 @@ and precision =
   [ Sure | About | Maybe | Before | After | OrYear of dmy2 | YearInt of dmy2 ]
 ;
 
-value float_of_fix : fix -> float;
-value fix_of_float : float -> fix;
-external fix : int -> fix = "%identity";
-external fix_repr : fix -> int = "%identity";
+value date_eq: date -> date -> bool;
 
-value no_consang : fix;
+type codate = 'a;
 
 value date_of_cdate : codate -> date;
 value cdate_of_date : date -> codate;
@@ -47,6 +43,13 @@ value cdate_of_date : date -> codate;
 value codate_None : codate;
 value od_of_codate : codate -> option date;
 value codate_of_od : option date -> codate;
+
+value float_of_fix : fix -> float;
+value fix_of_float : float -> fix;
+external fix : int -> fix = "%identity";
+external fix_repr : fix -> int = "%identity";
+
+value no_consang : fix;
 
 external int_of_iper : iper -> int = "%identity";
 external iper_of_int : int -> iper = "%identity";

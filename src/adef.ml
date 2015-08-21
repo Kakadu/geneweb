@@ -46,6 +46,17 @@ and precision =
   [ Sure | About | Maybe | Before | After | OrYear of dmy2 | YearInt of dmy2 ]
 ;
 
+(* *)
+value date_eq l r = (l=r)
+  (* match (l,r) with *)
+    (* [ (Dtext s1, Dtext s2) -> compare s1 s2 *)
+    (* | (Dtext _, Dgreg _) *)
+    (* | (Dgreg _, Dtext _)  -> False *)
+    (* | (Dgreg _ c1, Dgreg _ c2) when c1<>c2 -> False *)
+    (* | (Dgreg l _, Dgreg r _) -> (l=r) *)
+    (* ] *)
+;
+
 type cdate =
   [ Cgregorian of int
   | Cjulian of int
