@@ -1278,7 +1278,7 @@ value print_del_ok conf base wl =
   }
 ;
 
-value merge_new_event es e =
+value merge_new_event: list (gen_pers_event Update.key string) -> gen_pers_event Update.key string -> _ = fun es e ->
   [e :: es]
 ;
 
@@ -1364,40 +1364,43 @@ value print_mod_aux conf base callback =
 ;
 
 value fix_event_order conf base (gp: gen_person Update.key string) =
+  let id x = x in
   let base_p = poi base gp.key_index in
   let base_pevents = (gen_person_of_person base_p).pevents in
-  let base_pevents : list (gen_pers_event iper string) =
-    List.map (Futil.map_pers_event (fun x -> x) (sou base)) base_pevents in
 
-  let key_of_person iper =
+  let pair_of_person iper =
     let gp = gen_person_of_person (poi base iper) in
     let fname = sou base (gp.first_name) in
     let lname = sou base (gp.surname) in
-    (fname, lname, 0, Update.link, 0)
+    (fname, lname)
   in
+  let pair_of_update_key k =
+    let (fn,ln,_,_,_) = k in
+    (fn,ln)
+  in
+  let base_pevents : list (gen_pers_event (string*string) string) =
+    List.map (Futil.map_pers_event (pair_of_person) (sou base)) base_pevents in
 
-  let base_pevents : list (gen_pers_event iper string) =
-    List.map (Futil.map_pers_event (key_of_person) (fun x -> x) (sou base)) base_pevents in
-
-  let mem: gen_pers_event Update.key string -> list (gen_pers_event iper string) -> bool
-    = fun e es ->
-    (* helper es where helper es = *)
-    (*   match es with *)
-    (*     [ [] -> False *)
-    (*     | [ h::tl ] -> *)
-    False
+  let mem: gen_pers_event (string*string) string -> bool
+    = fun e ->
+    List.mem e base_pevents
   in
 
   let () = Printf.printf "fix_event_order (%d new events) (%d old events)\n"
                          (List.length gp.pevents)
                          (List.length base_pevents)
   in
+  (* let gen_events = List.map (Futil.map_pers_event pair_of_update_key id) gp.pevents in *)
+
   let (new_events, not_modified) =
     List.fold_left (fun (x,y) e ->
-                    if mem e base_pevents then (x,[e::y]) else ([e::x],y))
+                    let e' = Futil.map_pers_event pair_of_update_key id e in
+                    if mem e' then (x,[e::y]) else ([e::x],y))
                    ([],[])
                    gp.pevents in
   let not_modified = List.rev not_modified in
+  let () = Printf.printf "New events: %d, not_modified: %d\n" (List.length new_events)
+                         (List.length not_modified) in
   let ans = List.fold_left merge_new_event not_modified new_events in
   { (gp) with pevents = ans }
 ;
