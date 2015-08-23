@@ -3634,3 +3634,13 @@ value display_options conf =
   in
   s
 ;
+
+value list_init count (f: int -> 'a) =
+  let rec helper n xs =
+    (* let () = Printf.printf "list_init, n=%d, len=%d\n%!" n (List.length xs) in *)
+    if n>=0 then helper (n-1) [ (f n) :: xs ]
+    else let () = assert (List.length xs = count) in
+         xs
+  in
+  helper (count-1) []
+;

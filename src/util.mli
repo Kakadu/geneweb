@@ -167,9 +167,9 @@ value std_color : config -> string -> string;
 
 value index_of_sex : sex -> int;
 
-value string_of_pevent_name : 
+value string_of_pevent_name :
   config -> base -> gen_pers_event_name istr -> string;
-value string_of_fevent_name : 
+value string_of_fevent_name :
   config -> base -> gen_fam_event_name istr -> string;
 value string_of_witness_kind : config -> person -> witness_kind -> string;
 
@@ -282,3 +282,5 @@ value print_tips_relationship : config -> unit;
 value print_image_sex : config -> person -> int -> unit;
 
 value display_options : config -> string;
+
+value list_init: int -> (int -> 'a) -> list 'a;

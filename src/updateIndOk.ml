@@ -137,7 +137,7 @@ value reconstitute_somebody conf var =
   (first_name, surname, occ, create, var)
 ;
 
-value reconstitute_insert_pevent conf ext cnt el =
+value reconstitute_insert_pevent conf ext cnt (ww,el) =
   let var = "ins_event" ^ string_of_int cnt in
   let n =
     match (p_getenv conf.env var, p_getint conf.env (var ^ "_n")) with
@@ -145,23 +145,23 @@ value reconstitute_insert_pevent conf ext cnt el =
     | (Some "on", _) -> 1
     | _ -> 0 ]
   in
-  if n > 0 then
-    let el =
-      loop el n where rec loop el n =
+  if n <= 0 then (ww, el, ext)
+  else
+    let (ww,el) =
+      loop ww el n where rec loop ww el n =
         if n > 0 then
           let e1 =
             {epers_name = Epers_Name ""; epers_date = Adef.codate_None;
              epers_place = ""; epers_reason = ""; epers_note = "";
              epers_src = ""; epers_witnesses = [| |]}
           in
-          loop [e1 :: el] (n - 1)
-        else el
+          loop [None :: ww] [e1 :: el] (n - 1)
+        else (ww,el)
     in
-    (el, True)
-  else (el, ext)
+    (ww, el, True)
 ;
 
-value rec reconstitute_pevents conf ext cnt =
+value rec reconstitute_pevents conf ext cnt : (_*_*_)=
   match get_nth conf "e_name" cnt with
   [ Some epers_name ->
       let epers_name =
@@ -235,6 +235,11 @@ value rec reconstitute_pevents conf ext cnt =
         match get_nth conf "e_src" cnt with
         [ Some src -> only_printable src
         | _ -> "" ]
+      in
+      let weight =
+        match get_nth conf "e_weight" cnt with
+          [ Some s -> Some (int_of_string s)
+          | None -> None ]
       in
       (* Type du témoin par défaut lors de l'insertion de nouveaux témoins. *)
       let wk =
@@ -316,10 +321,11 @@ value rec reconstitute_pevents conf ext cnt =
          epers_note = epers_note; epers_src = epers_src;
          epers_witnesses = Array.of_list witnesses}
       in
-      let (el, ext) = reconstitute_pevents conf ext (cnt + 1) in
-      let (el, ext) = reconstitute_insert_pevent conf ext (cnt +1) el in
-      ([e :: el], ext)
-  | _ -> ([], ext) ]
+      let (ww, el, ext) = reconstitute_pevents conf ext (cnt + 1) in
+      let () = printf "!!! %d %d\n" (List.length ww) (List.length el) in
+      let (ww, el, ext) = reconstitute_insert_pevent conf ext (cnt +1) (ww,el) in
+      ([weight :: ww], [e :: el], ext)
+  | _ -> ([], [], ext) ]
 ;
 
 value reconstitute_add_relation conf ext cnt rl =
@@ -438,7 +444,7 @@ value reconstitute_burial conf burial_place =
   | Some x -> failwith ("bad burial type " ^ x) ]
 ;
 
-value reconstitute_from_pevents pevents ext bi bp de bu =
+value reconstitute_from_pevents ww pevents ext bi bp de bu =
   (* On tri les évènements pour être sûr. *)
   let pevents =
     CheckItem.sort_events
@@ -581,7 +587,7 @@ value reconstitute_from_pevents pevents ext bi bp de bu =
   (bi, bp, de, bu, pevents)
 ;
 
-value reconstitute_person conf =
+value reconstitute_person conf : (_*_*_) =
   let ext = False in
   let key_index =
     match p_getenv conf.env "i" with
@@ -669,21 +675,26 @@ value reconstitute_person conf =
     [ (NotDead | DontKnowIfDead, Buried _ | Cremated _) -> DeadDontKnowWhen
     | _ -> death ]
   in
-  let (pevents, ext) = reconstitute_pevents conf ext 1 in
-  let (pevents, ext) = reconstitute_insert_pevent conf ext 0 pevents in
+  let (ww, pevents, ext) = reconstitute_pevents conf ext 1 in
+  let () = printf "reconstitute_pevents return %d ws, %d es\n"
+                  (List.length ww)
+                  (List.length pevents)
+  in
+  let (ww, pevents, ext) = reconstitute_insert_pevent conf ext 0 (ww,pevents) in
   let notes =
     if first_name = "?" || surname = "?" then ""
     else only_printable_or_nl (strip_all_trailing_spaces (get conf "notes"))
   in
   let psources = only_printable (get conf "src") in
   (* Mise à jour des évènements principaux. *)
-  let (bi, bp, de, bu, pevents) =
-    reconstitute_from_pevents pevents ext
+  let (bi, bp, de, bu, ww, pevents) =
+    reconstitute_from_pevents ww pevents ext
       (Adef.codate_of_od birth, birth_place, birth_note, birth_src)
       (Adef.codate_of_od bapt, bapt_place, bapt_note, bapt_src)
       (death, death_place, death_note, death_src)
       (burial, burial_place, burial_note, burial_src)
   in
+  let () = printf "r_f_pevents returns %d pevents\n" (List.length pevents) in
   let (birth, birth_place, birth_note, birth_src) = bi in
   let (bapt, bapt_place, bapt_note, bapt_src) = bp in
   let (death, death_place, death_note, death_src) = de in
@@ -712,7 +723,7 @@ value reconstitute_person conf =
      burial_src = burial_src; pevents = pevents; notes = notes;
      psources = psources; key_index = Adef.iper_of_int key_index}
   in
-  (p, ext)
+  (ww, p, ext)
 ;
 
 value check_event_witnesses conf base witnesses =
@@ -1333,13 +1344,13 @@ value print_add o_conf base =
   let () = removed_string.val := [] in
   let conf = Update.update_conf o_conf in
   try
-    let (sp, ext) = reconstitute_person conf in
+    let (weights, sp, ext) = reconstitute_person conf in
     let redisp =
       match p_getenv conf.env "return" with
       [ Some _ -> True
       | _ -> False ]
     in
-    if ext || redisp then UpdateInd.print_update_ind conf base sp ""
+    if ext || redisp then UpdateInd.print_update_ind conf base (weights,sp) ""
     else do {
       let sp = strip_person sp in
       match check_person conf base sp with
@@ -1387,7 +1398,9 @@ value print_del conf base =
 
 value print_mod_aux conf base callback =
   try
-    let (p, ext) = reconstitute_person conf in
+    let (ww, p, ext) = reconstitute_person conf in
+    let () = printf "reconstitute_person returns %d ws, %d es\n" (List.length ww)
+                    (List.length p.pevents) in
     let redisp =
       match p_getenv conf.env "return" with
       [ Some _ -> True
@@ -1396,13 +1409,14 @@ value print_mod_aux conf base callback =
     let ini_ps = UpdateInd.string_person_of base (poi base p.key_index) in
     let digest = Update.digest_person ini_ps in
     if digest = raw_get conf "digest" then
-      if ext || redisp then UpdateInd.print_update_ind conf base p digest
-      else do {
+      if ext || redisp then UpdateInd.print_update_ind conf base (ww,p) digest
+      else
         let p = strip_person p in
+        let () = printf "After stripping pevents count = %d\n" (List.length p.pevents) in
         match check_person conf base p with
         [ Some err -> error_person conf base p err
-        | None -> callback p ]
-      }
+        | None -> callback ww p ]
+
     else Update.error_digest conf
   with
   [ Update.ModErr -> () ]
@@ -1473,7 +1487,9 @@ value print_mod o_conf base =
           (gen_person_of_person (poi base (Adef.iper_of_int (-1)))) ]
   in
   let conf = Update.update_conf o_conf in
-  let callback sp = do {
+  let callback ww sp = do {
+    let () = printf "Callback! pevents count = %d\n" (List.length sp.pevents) in
+    let () = UpdateInd.print_weights ww in
     let sp = fix_event_order conf base sp in
     let p = effective_mod conf base sp in
     let op = poi base p.key_index in
