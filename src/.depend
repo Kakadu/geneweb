@@ -403,7 +403,7 @@ updateIndOk.cmo: adef.cmi checkItem.cmi config.cmi def.cmi futil.cmi \
 updateIndOk.cmx: adef.cmx checkItem.cmx config.cmi def.cmi futil.cmx \
     gutil.cmx gwdb.cmx history.cmx hutil.cmx mutil.cmx name.cmx notes.cmx \
     notesLinks.cmx update.cmx updateInd.cmx util.cmx ../wserver/wserver.cmx \
-    updateIndOk.cmi
+    stringTools.cmx updateIndOk.cmi
 updateIndOk.cmi: checkItem.cmi config.cmi def.cmi gwdb.cmi update.cmi
 update_nldb.cmo: adef.cmi argl.cmo buff.cmo def.cmi gwdb.cmi notesLinks.cmi \
     progrBar.cmi secure.cmi

@@ -1,4 +1,5 @@
 open Def;
+open Printf;
 
 value string_of_pevent_name f e : string =
   match e with
@@ -57,5 +58,10 @@ value string_of_pevent_name f e : string =
 ;
 
 value string_of_pevent f e =
-  string_of_pevent_name f e.epers_name
+  sprintf "'%s' [%s]" (string_of_pevent_name f e.epers_name) ""
+;
+
+value string_of_event_weight = fun
+  [ Some w -> sprintf "Some %02d" w
+  | None -> "None   " ]
 ;
