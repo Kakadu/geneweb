@@ -53,9 +53,13 @@ function on_move_up(x) {
   <table>
     %foreach;pevent;
       <tr oldpos=%event.pos;>
-        <td onclick="on_move_up($(this));">Move up</td>
-        <td onclick="on_move_down($(this));">Move down</td>
-
+        %if;event.has_date;
+          <td></td>
+          <td></td>
+        %else;
+          <td onclick="on_move_up($(this));">Move up</td>
+          <td onclick="on_move_down($(this));">Move down</td>
+        %end;
         <td valign="top" style="white-space: nowrap;" width="1">
           <span class="edate">
             %if;event.has_date;%event.date; :
