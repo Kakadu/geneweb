@@ -1213,7 +1213,6 @@ value base1 base =
      patch_key ip fn sn occ = ();
      delete_key fn sn occ = ();
      insert_string s =
-       let () = if s<>"" then printf "base.insert_string '%s'\n%!" s else () in
        Istr (base.func.Dbdisk.insert_string s);
      commit_patches = base.func.Dbdisk.commit_patches;
      commit_notes = base.func.Dbdisk.commit_notes;

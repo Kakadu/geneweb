@@ -379,7 +379,6 @@ value make_senv conf base =
 value updmenu_print = Perso.interp_templ "updmenu";
 
 value family_m conf base =
-  let () = Printf.printf "Request.ml: family_m\n%!" in
   match p_getenv conf.env "m" with
   [ Some "A" ->
       match find_person_in_env conf base "" with
@@ -796,7 +795,6 @@ value trace_keys base (fn, sn, occ) ipo = do {
 };
 
 value treat_request conf base log = do {
-  printf "treat_request\n%!";
   match
     (p_getenv conf.base_env "moved",
      p_getenv conf.env "opt",

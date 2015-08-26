@@ -284,3 +284,4 @@ value print_image_sex : config -> person -> int -> unit;
 value display_options : config -> string;
 
 value list_init: int -> (int -> 'a) -> list 'a;
+value list_filter_map: ('a -> option 'b) -> list 'a -> list 'b;

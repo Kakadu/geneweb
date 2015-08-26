@@ -394,7 +394,7 @@ stringTools.cmo: def.cmo stringTools.cmi
 stringTools.cmx: def.cmi stringTools.cmi
 
 updateEventOrderOk.cmo: util.cmi def.cmi
-updateEventOrderOk.cmx: util.cmi def.cmi
+updateEventOrderOk.cmx: util.cmi def.cmi gwdb.cmx
 
 updateIndOk.cmo: adef.cmi checkItem.cmi config.cmi def.cmi futil.cmi \
     gutil.cmi gwdb.cmi history.cmi hutil.cmi mutil.cmi name.cmi notes.cmi \

@@ -3154,7 +3154,6 @@ value update_wf_trace conf fname =
 
 value commit_patches conf base =
   do {
-    Printf.printf "Util.commit_patches\n%!";
     Gwdb.commit_patches base;
     conf.henv :=
       List.map
@@ -3643,4 +3642,10 @@ value list_init count (f: int -> 'a) =
          xs
   in
   helper (count-1) []
+;
+
+value list_filter_map f xs =
+  let xs = List.map f xs in
+  let xs = List.filter (fun [ Some _ -> True | None -> False ]) xs in
+  List.map (fun [Some x -> x | None -> failwith "list_filter_map" ]) xs
 ;

@@ -162,7 +162,6 @@ value reconstitute_insert_pevent conf ext cnt el =
 ;
 
 value rec reconstitute_pevents conf ext cnt =
-  let () = printf "Trying reconstitute event with cnt = %d\n" cnt in
   match get_nth conf "e_name" cnt with
   [ Some epers_name ->
       let epers_name =
@@ -446,6 +445,17 @@ value reconstitute_burial conf burial_place =
   | Some x -> failwith ("bad burial type " ^ x) ]
 ;
 
+value sort_by_weights xs =
+  List.stable_sort (fun (w1,_) (w2,_) ->
+                    match (w1,w2) with
+                      [ (Some m, Some n) -> compare m n
+                      | (Some _, None) -> -1
+                      | (None, Some _) -> 1
+                      | (None, None) -> 0 ]
+                   ) xs
+;
+
+
 value reconstitute_from_pevents pevents ext bi bp de bu =
   (* There we get some vents reconstituted from POST data. New events have weight = None,
      old ones hace Some _. A few events are special birth, death, baptism, burial/cremation.
@@ -474,14 +484,7 @@ value reconstitute_from_pevents pevents ext bi bp de bu =
   (* let () = printf "After filtering there are %d pevents\n%!" (List.length pevents) in *)
 
   (* New events go to the end of the list *)
-  let pevents = List.stable_sort (fun (w1,_) (w2,_) ->
-                                  match (w1,w2) with
-                                    [ (Some m, Some n) -> compare m n
-                                    | (Some _, None) -> -1
-                                    | (None, Some _) -> 1
-                                    | (None, None) -> 0 ]
-                                 ) pevents
-  in
+  let pevents = sort_by_weights pevents in
   let found_birth = ref False in
   let found_baptism = ref False in
   let found_death = ref False in
@@ -1342,7 +1345,6 @@ value merge_new_event
 
   let is_dated_event e = None<>Adef.od_of_codate e.epers_date in
   let undated = not (is_dated_event e) in
-  (* let () = printf "merge_new_event. has_date = %b\n" (not undated) in *)
 
   let is_burial_crem_death e =
     List.mem e.epers_name [Epers_Burial; Epers_Cremation; Epers_Death]
@@ -1431,8 +1433,6 @@ value print_del conf base =
 value print_mod_aux conf base callback =
   try
     let (ww, p, ext) = reconstitute_person conf in
-    let () = printf "reconstitute_person returns %d ws, %d es\n" (List.length ww)
-                    (List.length p.pevents) in
     let redisp =
       match p_getenv conf.env "return" with
       [ Some _ -> True
@@ -1444,7 +1444,6 @@ value print_mod_aux conf base callback =
       if ext || redisp then UpdateInd.print_update_ind conf base (ww,p) digest
       else
         let p = strip_person p in
-        (*let ()=printf "After stripping pevents count = %d\n" (List.length p.pevents) in *)
         match check_person conf base p with
         [ Some err -> error_person conf base p err
         | None -> callback ww p ]
@@ -1454,50 +1453,50 @@ value print_mod_aux conf base callback =
   [ Update.ModErr -> () ]
 ;
 
-value fix_event_order conf base (gp: gen_person Update.key string) =
-  let id x = x in
-  let base_p = poi base gp.key_index in
-  let base_pevents = (gen_person_of_person base_p).pevents in
-
-  let pair_of_person iper =
-    let gp = gen_person_of_person (poi base iper) in
-    let fname = sou base (gp.first_name) in
-    let lname = sou base (gp.surname) in
-    (fname, lname)
+value fix_event_order conf base ww (gp: gen_person Update.key string) =
+  let base_pevents =
+    let base_p = poi base gp.key_index in
+    (gen_person_of_person base_p).pevents
   in
-  let pair_of_update_key k =
-    let (fn,ln,_,_,_) = k in
-    (fn,ln)
-  in
-  let base_pevents : list (gen_pers_event (string*string) string) =
-    List.map (Futil.map_pers_event (pair_of_person) (sou base)) base_pevents in
+  let base_pevents_count = List.length base_pevents in
 
-  let mem: gen_pers_event (string*string) string -> bool
-    = fun e ->
-    List.mem e base_pevents
+  let () = assert (List.length ww = List.length gp.pevents) in
+  let () = List.iter (fun [ Some n -> assert (n<base_pevents_count)
+                          | None -> () ] ) ww
   in
+  (* All new events have weight = None, old ones -- Some _. Also old events with changed
+     date should be considered as new.
+     We need to sort old events and insert new ones to that list. *)
 
-  (* let () = Printf.printf "fix_event_order (%d new events) (%d old events)\n" *)
-  (*                        (List.length gp.pevents) *)
-  (*                        (List.length base_pevents) *)
+  let paired = List.map2 (fun a b -> (a,b)) ww gp.pevents in
+  (* let () = *)
+  (*   let () = List.iter (fun (w,e) -> *)
+  (*                       printf "%s %s\n" *)
+  (*                              (StringTools.string_of_event_weight w) *)
+  (*                              (StringTools.string_of_pevent id e) *)
+  (*                      ) paired *)
+  (*   in *)
+  (*   print_endline "====================" *)
   (* in *)
 
-  let (new_events, not_modified) =
-    List.fold_left (fun (x,y) e ->
-                    let e' = Futil.map_pers_event pair_of_update_key id e in
-                    if mem e' then (x,[e::y]) else ([e::x],y))
-                   ([],[])
-                   gp.pevents in
-  let not_modified = List.rev not_modified in
-  (* let () = Printf.printf "New events: %d, not_modified: %d\n" (List.length new_events) *)
-  (*                        (List.length not_modified) in *)
-  let ans = List.fold_left merge_new_event not_modified new_events in
-  (* let () = List.iter *)
-  (*            (fun e -> print_endline *)
-  (*                        (StringTools.string_of_pevent_name id e.epers_name) ) *)
-  (*            ans *)
-  (* in *)
-  (* let () = print_endline "===================\n" in *)
+  let (old_events, new_events) =
+    let f = fun
+        [ (None,_) -> False
+        | (Some n,e) when e.epers_date <> (List.nth base_pevents n).epers_date ->
+           False
+        | (Some _,_) -> True
+        ]
+    in
+    List.partition f paired
+  in
+
+  let old_events =
+    let old_events = sort_by_weights old_events in
+    list_filter_map (fun [ (Some _,x) -> Some x | (None,_) -> None]) old_events
+  in
+
+  let new_events = List.map snd new_events in
+  let ans = List.fold_left merge_new_event old_events new_events in
   { (gp) with pevents = ans }
 ;
 
@@ -1519,8 +1518,7 @@ value print_mod o_conf base =
   in
   let conf = Update.update_conf o_conf in
   let callback ww sp = do {
-    let () = UpdateInd.print_weights ww in
-    let sp = fix_event_order conf base sp in
+    let sp = fix_event_order conf base ww sp in
     let p = effective_mod conf base sp in
     let op = poi base p.key_index in
     let u = {family = get_family op} in
