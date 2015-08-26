@@ -1248,13 +1248,7 @@ value relation_sex_is_coherent base warning p =
     p.rparents
 ;
 
-<<<<<<< HEAD
 value all_checks_person conf base p a u =
-=======
-value all_checks_person : config -> base ->
-  gen_person iper istr -> gen_ascend ifam ->  gen_union ifam -> list CheckItem.base_warning
-= fun conf base p a u ->
->>>>>>> 0623dfdb5cd82d21182c95b66d7922a15a53c7f0
   let wl = ref [] in
   let error = Update.error conf base in
   let warning w = wl.val := [w :: wl.val] in
@@ -1324,13 +1318,7 @@ value print_del_ok conf base wl =
   }
 ;
 
-<<<<<<< HEAD
 value merge_new_event es e =
-=======
-value merge_new_event
-: list (gen_pers_event Update.key string) -> gen_pers_event Update.key string -> list _
-= fun es e ->
->>>>>>> 0623dfdb5cd82d21182c95b66d7922a15a53c7f0
   let rec insert_after_or_in_head cond e xs =
     match xs with
       [ [ x::xs ] when cond x -> [ x :: insert_after_or_in_head cond e xs ]
