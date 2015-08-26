@@ -388,6 +388,10 @@ updateInd.cmx: adef.cmx calendar.cmx config.cmi def.cmi futil.cmx gwdb.cmx \
     hutil.cmx templ.cmx templAst.cmi update.cmx util.cmx perso.cmx \
     ../wserver/wserver.cmx updateInd.cmi
 updateInd.cmi: config.cmi def.cmi gwdb.cmi update.cmi
+
+updateEventOrderOk.cmo: util.cmi def.cmi
+updateEventOrderOk.cmx: util.cmi def.cmi gwdb.cmx
+
 updateIndOk.cmo: adef.cmi checkItem.cmi config.cmi def.cmi futil.cmi \
     gutil.cmi gwdb.cmi history.cmi hutil.cmi mutil.cmi name.cmi notes.cmi \
     notesLinks.cmi update.cmi updateInd.cmi util.cmi ../wserver/wserver.cmi \

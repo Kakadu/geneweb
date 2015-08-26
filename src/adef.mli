@@ -5,7 +5,6 @@ type iper = 'a;
 type ifam = 'a;
 type istr = 'a;
 type fix = 'a;
-type cdate = 'a;
 type codate = 'a;
 type gen_couple 'person = 'a;
 
@@ -39,8 +38,8 @@ external fix_repr : fix -> int = "%identity";
 
 value no_consang : fix;
 
-value date_of_cdate : cdate -> date;
-value cdate_of_date : date -> cdate;
+value date_of_cdate : codate -> date;
+value cdate_of_date : date -> codate;
 
 value codate_None : codate;
 value od_of_codate : codate -> option date;
