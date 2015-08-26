@@ -648,6 +648,7 @@ and eval_string_env var env =
 ;
 
 (* print *)
+type event_weights = list (option int);
 
 value print_foreach print_ast eval_expr =
   let rec print_foreach env p loc s sl _ al =
