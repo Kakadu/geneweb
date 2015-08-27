@@ -1350,15 +1350,25 @@ value merge_new_event es e =
        (fun e -> e.epers_name=Epers_Burial || e.epers_name=Epers_Cremation) e es
   | _ when undated ->
      insert_before_or_to_tail is_burial_crem_death e es
+  | newe when not (List.exists is_dated_event es) ->
+     (* dated event without other dated events goes first *)
+     [ newe :: es ]
   | newe ->
-     (* Skip while new event is before current and before B/C/D *)
-     let newdate = Adef.date_of_cdate newe.epers_date in
-     let skip e = (e.epers_name=Epers_Birth) || (e.epers_name=Epers_Baptism) ||
-       not (is_burial_crem_death e) ||
-       not (is_dated_event e) ||
-       CheckItem.strictly_before newdate (Adef.date_of_cdate newe.epers_date)
+     let \< l r = CheckItem.strictly_before (Adef.date_of_cdate l.epers_date)
+                                               (Adef.date_of_cdate r.epers_date)
      in
-     insert_after_or_in_head skip newe es
+     (* new dated event in presence of other dated events in worst case goes to the end *)
+     let insert_pos =
+       list_fold_left_i (fun n acc e ->
+                         if not (is_dated_event e) then acc
+                         else
+                           if e < newe then acc
+                           else
+                             min acc n
+                        )
+                        (List.length es) es
+     in
+     list_insert_after_n insert_pos newe es
   ]
 ;
 

@@ -3649,3 +3649,18 @@ value list_filter_map f xs =
   List.map (fun [Some x -> x | None -> failwith "list_filter_map" ]) xs
 ;
 
+
+value list_fold_left_i f init xs =
+  let i = ref (-1) in
+  List.fold_left (fun acc x -> let () = incr i in f i.val acc x) init xs
+;
+
+value list_insert_after_n n x xs =
+  if n > List.length xs then failwith "Bad_argument: list_insert_after_n"
+  else
+    let rec helper n left xs =
+      if n>0 then helper (n-1) [ List.hd xs :: left ] (List.tl xs)
+      else List.fold_left (fun acc y -> [ y :: acc ]) [ x :: xs ] left
+    in
+    helper n [] xs
+;

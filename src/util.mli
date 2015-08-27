@@ -285,3 +285,8 @@ value display_options : config -> string;
 
 value list_init: int -> (int -> 'a) -> list 'a;
 value list_filter_map: ('a -> option 'b) -> list 'a -> list 'b;
+(** Same as [fold_left f init xs] but [f] get list element position as 1st argument *)
+value list_fold_left_i: (int -> 'acc -> 'a -> 'acc) -> 'acc -> list 'a -> 'acc;
+(** Function [list_insert_after n x xs] inserts [x] between nth and (n+1)th elements
+    of the list [xs]  *)
+value list_insert_after_n: int -> 'a -> list 'a -> list 'a;
