@@ -22,6 +22,40 @@ value raw_get conf key =
   | None -> failwith (key ^ " unbound") ]
 ;
 
+value print_weights ws =
+  let () = printf "Got %d weights\n" (List.length ws) in
+  let () = List.iter (fun [ Some int -> printf "Some %d\n" int | None -> printf "None\n"])
+                     ws
+  in
+  print_endline "------"
+  ;
+
+
+value string_of_event e =
+  match e.epers_name with
+    [ Epers_Birth  -> "bir"
+    | Epers_Baptism -> "bapt"
+    | Epers_Death  -> "death"
+    | Epers_Burial -> "bur"
+    | Epers_Cremation -> "cre"
+    | Epers_Name s -> "Name " ^ s
+    | _ -> "???"
+    ]
+;
+
+value print_evs_n_weights ws =
+  let () = printf "Got %d e_n_w\n" (List.length ws) in
+  let f (w,e)  =
+    let s = match w with
+        [ Some x -> sprintf "Some %02d" x
+        | None ->           "None   " ]
+    in
+    printf "%s %s\n" s (string_of_event e)
+  in
+  let () = List.iter f ws in
+  print_endline "+++++"
+;
+
 value get conf key =
   match p_getenv conf.env key with
   [ Some v -> v
@@ -468,6 +502,7 @@ value reconstitute_from_pevents pevents ext bi bp de bu =
     if  (e.epers_name = Epers_Name "" && w=None) then False else
     (match e.epers_name with
        [ Epers_Name "" | Epers_Baptism | Epers_Death | Epers_Burial
+       | Epers_Birth -> True
        | Epers_Cremation -> True
        | _ -> False]) &&
     (Adef.od_of_codate e.epers_date = None) &&
@@ -553,32 +588,32 @@ value reconstitute_from_pevents pevents ext bi bp de bu =
   in
   let (bi, bp, de, bu) = loop pevents bi bp de bu in
   (* Hack *)
-  let pevents =
-    if not found_death.val then
-      let remove_evt = ref False in
-      List.fold_left
-        (fun accu ((_,evt) as e) ->
-           if not remove_evt.val then
-             if evt.epers_name = Epers_Name "" then
-               do { remove_evt.val := True; accu }
-             else [e :: accu]
-           else [e :: accu])
-        [] (List.rev pevents)
-    else pevents
-  in
-  let pevents =
-    if not found_burial.val then
-      let remove_evt = ref False in
-      List.fold_left
-        (fun accu ((_,evt) as e) ->
-           if not remove_evt.val then
-             if evt.epers_name = Epers_Name "" then
-               do { remove_evt.val := True; accu }
-             else [e :: accu]
-           else [e :: accu])
-        [] (List.rev pevents)
-    else pevents
-  in
+  (* let pevents = *)
+  (*   if not found_death.val then *)
+  (*     let remove_evt = ref False in *)
+  (*     List.fold_left *)
+  (*       (fun accu ((_,evt) as e) -> *)
+  (*          if not remove_evt.val then *)
+  (*            if evt.epers_name = Epers_Name "" then *)
+  (*              do { remove_evt.val := True; print_endline "event for death killed"; accu } *)
+  (*            else [e :: accu] *)
+  (*          else [e :: accu]) *)
+  (*       [] (List.rev pevents) *)
+  (*   else pevents *)
+  (* in *)
+  (* let pevents = *)
+  (*   if not found_burial.val then *)
+  (*     let remove_evt = ref False in *)
+  (*     List.fold_left *)
+  (*       (fun accu ((_,evt) as e) -> *)
+  (*          if not remove_evt.val then *)
+  (*            if evt.epers_name = Epers_Name "" then *)
+  (*              do { remove_evt.val := True; print_endline "event for burial killed"; accu } *)
+  (*            else [e :: accu] *)
+  (*          else [e :: accu]) *)
+  (*       [] (List.rev pevents) *)
+  (*   else pevents *)
+  (* in *)
   let pevents =
     if not ext then
       let remove_evt = ref False in
@@ -586,12 +621,13 @@ value reconstitute_from_pevents pevents ext bi bp de bu =
         (fun accu ((_,evt) as e) ->
            if not remove_evt.val then
              if evt.epers_name = Epers_Name "" then
-               do { remove_evt.val := True; accu }
+               do { remove_evt.val := True; print_endline "event for (not ext)killed"; accu }
              else [e :: accu]
            else [e :: accu])
         [] (List.rev pevents)
     else pevents
   in
+
   (* Il faut gérer le cas où l'on supprime délibérément l'évènement. *)
   let bi =
     if not found_birth.val then (Adef.codate_None, "", "", "")
@@ -714,6 +750,9 @@ value reconstitute_person conf =
   in
   let psources = only_printable (get conf "src") in
   (* Mise à jour des évènements principaux. *)
+  let () = printf "before reconstitute from pevents len = %d\n"
+                  (List.length events_n_weights) in
+  let () = print_evs_n_weights events_n_weights in
   let (bi, bp, de, bu, events_n_weights) =
     reconstitute_from_pevents events_n_weights ext
       (Adef.codate_of_od birth, birth_place, birth_note, birth_src)
@@ -721,6 +760,8 @@ value reconstitute_person conf =
       (death, death_place, death_note, death_src)
       (burial, burial_place, burial_note, burial_src)
   in
+  let () = printf "len = %d\n" (List.length events_n_weights) in
+  let () = print_evs_n_weights events_n_weights in
 
   let ww = List.map fst events_n_weights in
   let pevents = List.map snd events_n_weights in
