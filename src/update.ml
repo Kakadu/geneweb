@@ -8,6 +8,7 @@ open Gutil;
 open Gwdb;
 open Hutil;
 open Util;
+open Printf;
 
 exception ModErr;
 type create_info =
@@ -21,6 +22,8 @@ type create_info =
 ;
 type create = [ Create of sex and option create_info | Link ];
 type key = (string * string * int * create * string);
+
+value string_of_key (a,b,n,_,c) = Printf.sprintf "(\"%s\" \"%s\" %d _ \"%s\")" a b n c;
 
 value infer_death conf birth bapt =
   match (birth, bapt) with
@@ -156,6 +159,7 @@ value print_err_unknown conf base (f, s, o) =
 ;
 
 value update_misc_names_of_family base p_sex u =
+  let () = printf "update_misc_names_of_family\n%!" in
   match p_sex with
   [ Male ->
       List.iter
@@ -1073,6 +1077,7 @@ value print_create_conflict conf base p var =
 ;
 
 value add_misc_names_for_new_persons base new_persons =
+  let () = printf "add_misc_names_for_new_persons\n%!" in
   List.iter
     (fun p ->
        List.iter (fun n -> person_ht_add base n p.key_index)
@@ -1080,7 +1085,8 @@ value add_misc_names_for_new_persons base new_persons =
     new_persons
 ;
 
-value insert_person conf base src new_persons (f, s, o, create, var) =
+value insert_person conf base src new_persons ((f, s, o, create, var) as key) =
+  let () = Printf.printf "insert_person. key = %s\n%!" (string_of_key key) in
   let f = if f = "" then "?" else f in
   let s = if s = "" then "?" else s in
   match create with

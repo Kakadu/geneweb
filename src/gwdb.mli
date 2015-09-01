@@ -8,6 +8,8 @@ type istr = 'abstract;
 type person = 'abstract;
 type family = 'abstract;
 
+value string_of_family: family -> string;
+
 type relation = Def.gen_relation iper istr;
 type title = Def.gen_title istr;
 type pers_event = Def.gen_pers_event iper istr;

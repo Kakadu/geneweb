@@ -713,6 +713,7 @@ value get_consang a =
   | _ -> wrap_asc f f f a ]
 ;
 value get_parents a =
+  (* let () = print_endline "Gwdb.get_parents" in *)
   let f pf = pf.get_parents in
   match a with
   [ Person2 db2 i _ ->
@@ -740,6 +741,12 @@ and family2_dat =
   { fam2 : mutable option (option (gen_family iper string));
     cpl2 : mutable option (option (gen_couple iper));
     des2 : mutable option (option (gen_descend iper)) }
+;
+
+value string_of_family = fun
+  [ Family  _ n _ -> sprintf "Family(_,%d,_)" n
+  | Family2 _ n _ -> sprintf "Family(_,%d,_)" n
+  ]
 ;
 
 type family_fun 'f 'c 'd =
@@ -934,7 +941,7 @@ value wrap_des f g h =
       | None -> g family2_fun (db2, i) ] ]
 ;
 
-value get_comment fam =
+value get_comment (fam:family) =
   let f pf = pf.get_comment in
   wrap_fam f f f fam
 ;
@@ -1188,17 +1195,26 @@ value base1 base =
      patch_person ip p =
        let p = map_person_ps (fun p -> p) un_istr p in
        base.func.Dbdisk.patch_person ip p;
-     patch_ascend ip a = base.func.Dbdisk.patch_ascend ip a;
-     patch_union ip u = base.func.Dbdisk.patch_union ip u;
+     patch_ascend ip a =
+       let () = printf "patch_ascend ip=%s\n%!" (Adef.string_of_iper ip) in
+       base.func.Dbdisk.patch_ascend ip a;
+     patch_union ip u =
+       let () = printf "Gwdb.patch_union iper=%s\n%!" (Adef.string_of_iper ip) in
+       base.func.Dbdisk.patch_union ip u;
      patch_family ifam f =
+       let () = printf "Gwdb.patch_family ifam=%s\n%!" (Adef.string_of_ifam ifam) in
        let f = map_family_ps (fun p -> p) un_istr f in
        base.func.Dbdisk.patch_family ifam f;
      patch_descend ifam d = base.func.Dbdisk.patch_descend ifam d;
-     patch_couple ifam c = base.func.Dbdisk.patch_couple ifam c;
+     patch_couple ifam c =
+       let () = printf "Gwdb.patch_couple ifam=%s\n%!" (Adef.string_of_ifam ifam) in
+       base.func.Dbdisk.patch_couple ifam c;
      patch_name s ip = base.func.Dbdisk.patch_name s ip;
      patch_key ip fn sn occ = ();
      delete_key fn sn occ = ();
-     insert_string s = Istr (base.func.Dbdisk.insert_string s);
+     insert_string s =
+       let () = if s<>"" then printf "base.insert_string '%s'\n%!" s else () in
+       Istr (base.func.Dbdisk.insert_string s);
      commit_patches = base.func.Dbdisk.commit_patches;
      commit_notes = base.func.Dbdisk.commit_notes;
      is_patched_person ip = base.func.Dbdisk.is_patched_person ip;

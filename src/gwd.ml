@@ -1753,6 +1753,7 @@ value wserver_auto_call = ref False
 END;
 
 value geneweb_server () =
+  let () = print_endline "geneweb_server()" in
   let auto_call =
     IFDEF SYS_COMMAND THEN wserver_auto_call.val
     ELSE try let _ = Sys.getenv "WSERVER" in True with [ Not_found -> False ]

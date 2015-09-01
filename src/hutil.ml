@@ -166,6 +166,7 @@ value error_cannot_access conf fname = do {
 value gen_interp header conf base fname ifun env ep = do {
   let v = Templ.template_file.val in
   Templ.template_file.val := fname;
+  let () = Printf.printf "gen_interp fname = '%s'\n%!" fname in
   try
     match Templ.input_templ conf fname with
     [ Some astl -> do {
@@ -188,4 +189,3 @@ value interp_no_header conf base fname ifun env ep =
 
 value interp conf base fname ifun env ep =
   gen_interp True conf base fname ifun env ep;
-
