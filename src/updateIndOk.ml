@@ -803,7 +803,7 @@ value error_person conf base p err =
   }
 ;
 
-value strip_pevents p =
+value strip_pevents es =
   let strip_array_witness pl =
     let pl =
       List.fold_right
@@ -813,7 +813,7 @@ value strip_pevents p =
     Array.of_list pl
   in
   List.fold_right
-    (fun e accu ->
+    (fun (w,e) accu ->
        let (has_infos, witnesses) =
          match e.epers_name with
          [ Epers_Name s -> (s <> "", strip_array_witness e.epers_witnesses)
@@ -824,23 +824,32 @@ value strip_pevents p =
          | _ -> (True, strip_array_witness e.epers_witnesses) ]
        in
        if (has_infos || Array.length witnesses > 0) then
-         [ {(e) with epers_witnesses = witnesses} :: accu ]
+         [ (w, {(e) with epers_witnesses = witnesses}) :: accu ]
        else accu)
-    p.pevents []
+    es []
 ;
 
 value strip_list = List.filter (fun s -> s <> "");
 
-value strip_person p =
-  {(p) with
-   first_names_aliases = strip_list p.first_names_aliases;
-   surnames_aliases = strip_list p.surnames_aliases;
-   qualifiers = strip_list p.qualifiers;
-   aliases = strip_list p.aliases;
-   titles = List.filter (fun t -> t.t_ident <> "") p.titles;
-   pevents = strip_pevents p;
-   rparents =
-     List.filter (fun r -> r.r_fath <> None || r.r_moth <> None) p.rparents}
+value strip_person weights p =
+  let () = assert (List.length weights = List.length p.pevents) in
+  let (ws, es) =
+    let xs = List.map2 (fun a b -> (a,b)) weights p.pevents in
+    let xs = strip_pevents xs in
+    (List.map fst xs, List.map snd xs)
+  in
+
+  let p = {(p) with
+            first_names_aliases = strip_list p.first_names_aliases;
+            surnames_aliases = strip_list p.surnames_aliases;
+            qualifiers = strip_list p.qualifiers;
+            aliases = strip_list p.aliases;
+            titles = List.filter (fun t -> t.t_ident <> "") p.titles;
+            pevents = es;
+            rparents =
+              List.filter (fun r -> r.r_fath <> None || r.r_moth <> None) p.rparents}
+  in
+  (ws, p)
 ;
 
 value print_conflict conf base p =
@@ -1386,7 +1395,7 @@ value print_add o_conf base =
     in
     if ext || redisp then UpdateInd.print_update_ind conf base (weights,sp) ""
     else do {
-      let sp = strip_person sp in
+      let (_,sp) = strip_person weights sp in
       match check_person conf base sp with
       [ Some err -> error_person conf base sp err
       | None ->
@@ -1443,7 +1452,7 @@ value print_mod_aux conf base callback =
     if digest = raw_get conf "digest" then
       if ext || redisp then UpdateInd.print_update_ind conf base (ww,p) digest
       else
-        let p = strip_person p in
+        let (ww,p) = strip_person ww p in
         match check_person conf base p with
         [ Some err -> error_person conf base p err
         | None -> callback ww p ]
