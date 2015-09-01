@@ -71,8 +71,16 @@ function on_move_up(x) {
           <span>
             %apply;capitalize(event.name)%sp;
             %if;event.has_spouse;([with] %event.spouse;)%end;
+            %if;event.has_place; - %event.place;%end;
           </span>
-
+          %if;event.has_witnesses;
+            <p style="margin:0;">
+              %foreach;event_witness;
+                <span>%apply;capitalize(event_witness_kind) :</span>
+                %apply;short_display_person("event_witness")<br/>
+              %end;
+            </p>
+          %end;
           %if;event.has_note;
             <div>%event.note;</div>
           %end;
