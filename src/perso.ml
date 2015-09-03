@@ -2607,6 +2607,7 @@ and eval_bool_event_field
   fun
   [ "has_date" -> p_auth && date <> Adef.codate_None
   | "has_place" -> p_auth && sou base place <> ""
+  | "is_reordable" -> p_auth && (Adef.is_reordable date)
   | "has_note" -> p_auth && sou base note <> ""
   | "has_src" -> p_auth && sou base src <> ""
   | "has_witnesses" -> p_auth && Array.length w > 0

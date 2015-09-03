@@ -19,12 +19,20 @@ value print_reorder_ok conf base person =
   }
 ;
 
+module IntSet = Set.Make (struct
+                            type t = int;
+                            value compare = compare;
+                         end);
+
 value verify_permutation expected_len xs =
-  (* TODO: check for length and validate *)
   let len = List.length xs in
-  let () = printf "Verify that int permutation '%s' is permutation of numbers from 0 to %d\n"
-                  (String.concat "," (List.map string_of_int xs)) (len-1) in
-  True
+  (len = expected_len) &&
+  (* all values in  range *)
+  List.for_all (fun x -> (0<=x) && (x<len)) xs &&
+  (* no dublicates *)
+  fst (List.fold_left (fun (ans,set) x -> if IntSet.mem x set then (False,set)
+                                          else (ans, IntSet.add x set)
+                      ) (True, IntSet.empty) xs)
 ;
 
 value apply_permutation perm xs =

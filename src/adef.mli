@@ -48,6 +48,10 @@ value codate_None : codate;
 value od_of_codate : codate -> option date;
 value codate_of_od : option date -> codate;
 
+(* Returns True if date should be reordered manually (i.e. is not comparable with values
+   of type 'date' *)
+value is_reordable : codate -> bool;
+
 external int_of_iper : iper -> int = "%identity";
 external iper_of_int : int -> iper = "%identity";
 external int_of_ifam : ifam -> int = "%identity";

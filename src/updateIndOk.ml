@@ -22,6 +22,40 @@ value raw_get conf key =
   | None -> failwith (key ^ " unbound") ]
 ;
 
+value print_weights ws =
+  let () = printf "Got %d weights\n" (List.length ws) in
+  let () = List.iter (fun [ Some int -> printf "Some %d\n" int | None -> printf "None\n"])
+                     ws
+  in
+  print_endline "------"
+  ;
+
+
+value string_of_event e =
+  match e.epers_name with
+    [ Epers_Birth  -> "bir"
+    | Epers_Baptism -> "bapt"
+    | Epers_Death  -> "death"
+    | Epers_Burial -> "bur"
+    | Epers_Cremation -> "cre"
+    | Epers_Name s -> "Name " ^ s
+    | _ -> "???"
+    ]
+;
+
+value print_evs_n_weights ws =
+  let () = printf "Got %d e_n_w\n" (List.length ws) in
+  let f (w,e)  =
+    let s = match w with
+        [ Some x -> sprintf "Some %02d" x
+        | None ->           "None   " ]
+    in
+    printf "%s %s\n" s (string_of_event e)
+  in
+  let () = List.iter f ws in
+  print_endline "+++++"
+;
+
 value get conf key =
   match p_getenv conf.env key with
   [ Some v -> v
@@ -468,6 +502,7 @@ value reconstitute_from_pevents pevents ext bi bp de bu =
     if  (e.epers_name = Epers_Name "" && w=None) then False else
     (match e.epers_name with
        [ Epers_Name "" | Epers_Baptism | Epers_Death | Epers_Burial
+       | Epers_Birth -> True
        | Epers_Cremation -> True
        | _ -> False]) &&
     (Adef.od_of_codate e.epers_date = None) &&
@@ -553,32 +588,32 @@ value reconstitute_from_pevents pevents ext bi bp de bu =
   in
   let (bi, bp, de, bu) = loop pevents bi bp de bu in
   (* Hack *)
-  let pevents =
-    if not found_death.val then
-      let remove_evt = ref False in
-      List.fold_left
-        (fun accu ((_,evt) as e) ->
-           if not remove_evt.val then
-             if evt.epers_name = Epers_Name "" then
-               do { remove_evt.val := True; accu }
-             else [e :: accu]
-           else [e :: accu])
-        [] (List.rev pevents)
-    else pevents
-  in
-  let pevents =
-    if not found_burial.val then
-      let remove_evt = ref False in
-      List.fold_left
-        (fun accu ((_,evt) as e) ->
-           if not remove_evt.val then
-             if evt.epers_name = Epers_Name "" then
-               do { remove_evt.val := True; accu }
-             else [e :: accu]
-           else [e :: accu])
-        [] (List.rev pevents)
-    else pevents
-  in
+  (* let pevents = *)
+  (*   if not found_death.val then *)
+  (*     let remove_evt = ref False in *)
+  (*     List.fold_left *)
+  (*       (fun accu ((_,evt) as e) -> *)
+  (*          if not remove_evt.val then *)
+  (*            if evt.epers_name = Epers_Name "" then *)
+  (*              do { remove_evt.val := True; print_endline "event for death killed"; accu } *)
+  (*            else [e :: accu] *)
+  (*          else [e :: accu]) *)
+  (*       [] (List.rev pevents) *)
+  (*   else pevents *)
+  (* in *)
+  (* let pevents = *)
+  (*   if not found_burial.val then *)
+  (*     let remove_evt = ref False in *)
+  (*     List.fold_left *)
+  (*       (fun accu ((_,evt) as e) -> *)
+  (*          if not remove_evt.val then *)
+  (*            if evt.epers_name = Epers_Name "" then *)
+  (*              do { remove_evt.val := True; print_endline "event for burial killed"; accu } *)
+  (*            else [e :: accu] *)
+  (*          else [e :: accu]) *)
+  (*       [] (List.rev pevents) *)
+  (*   else pevents *)
+  (* in *)
   let pevents =
     if not ext then
       let remove_evt = ref False in
@@ -586,12 +621,13 @@ value reconstitute_from_pevents pevents ext bi bp de bu =
         (fun accu ((_,evt) as e) ->
            if not remove_evt.val then
              if evt.epers_name = Epers_Name "" then
-               do { remove_evt.val := True; accu }
+               do { remove_evt.val := True; print_endline "event for (not ext)killed"; accu }
              else [e :: accu]
            else [e :: accu])
         [] (List.rev pevents)
     else pevents
   in
+
   (* Il faut gérer le cas où l'on supprime délibérément l'évènement. *)
   let bi =
     if not found_birth.val then (Adef.codate_None, "", "", "")
@@ -714,6 +750,9 @@ value reconstitute_person conf =
   in
   let psources = only_printable (get conf "src") in
   (* Mise à jour des évènements principaux. *)
+  let () = printf "before reconstitute from pevents len = %d\n"
+                  (List.length events_n_weights) in
+  let () = print_evs_n_weights events_n_weights in
   let (bi, bp, de, bu, events_n_weights) =
     reconstitute_from_pevents events_n_weights ext
       (Adef.codate_of_od birth, birth_place, birth_note, birth_src)
@@ -721,6 +760,8 @@ value reconstitute_person conf =
       (death, death_place, death_note, death_src)
       (burial, burial_place, burial_note, burial_src)
   in
+  let () = printf "len = %d\n" (List.length events_n_weights) in
+  let () = print_evs_n_weights events_n_weights in
 
   let ww = List.map fst events_n_weights in
   let pevents = List.map snd events_n_weights in
@@ -803,7 +844,7 @@ value error_person conf base p err =
   }
 ;
 
-value strip_pevents p =
+value strip_pevents es =
   let strip_array_witness pl =
     let pl =
       List.fold_right
@@ -813,7 +854,7 @@ value strip_pevents p =
     Array.of_list pl
   in
   List.fold_right
-    (fun e accu ->
+    (fun (w,e) accu ->
        let (has_infos, witnesses) =
          match e.epers_name with
          [ Epers_Name s -> (s <> "", strip_array_witness e.epers_witnesses)
@@ -824,23 +865,32 @@ value strip_pevents p =
          | _ -> (True, strip_array_witness e.epers_witnesses) ]
        in
        if (has_infos || Array.length witnesses > 0) then
-         [ {(e) with epers_witnesses = witnesses} :: accu ]
+         [ (w, {(e) with epers_witnesses = witnesses}) :: accu ]
        else accu)
-    p.pevents []
+    es []
 ;
 
 value strip_list = List.filter (fun s -> s <> "");
 
-value strip_person p =
-  {(p) with
-   first_names_aliases = strip_list p.first_names_aliases;
-   surnames_aliases = strip_list p.surnames_aliases;
-   qualifiers = strip_list p.qualifiers;
-   aliases = strip_list p.aliases;
-   titles = List.filter (fun t -> t.t_ident <> "") p.titles;
-   pevents = strip_pevents p;
-   rparents =
-     List.filter (fun r -> r.r_fath <> None || r.r_moth <> None) p.rparents}
+value strip_person weights p =
+  let () = assert (List.length weights = List.length p.pevents) in
+  let (ws, es) =
+    let xs = List.map2 (fun a b -> (a,b)) weights p.pevents in
+    let xs = strip_pevents xs in
+    (List.map fst xs, List.map snd xs)
+  in
+
+  let p = {(p) with
+            first_names_aliases = strip_list p.first_names_aliases;
+            surnames_aliases = strip_list p.surnames_aliases;
+            qualifiers = strip_list p.qualifiers;
+            aliases = strip_list p.aliases;
+            titles = List.filter (fun t -> t.t_ident <> "") p.titles;
+            pevents = es;
+            rparents =
+              List.filter (fun r -> r.r_fath <> None || r.r_moth <> None) p.rparents}
+  in
+  (ws, p)
 ;
 
 value print_conflict conf base p =
@@ -1350,15 +1400,25 @@ value merge_new_event es e =
        (fun e -> e.epers_name=Epers_Burial || e.epers_name=Epers_Cremation) e es
   | _ when undated ->
      insert_before_or_to_tail is_burial_crem_death e es
+  | newe when not (List.exists is_dated_event es) ->
+     (* dated event without other dated events goes first *)
+     [ newe :: es ]
   | newe ->
-     (* Skip while new event is before current and before B/C/D *)
-     let newdate = Adef.date_of_cdate newe.epers_date in
-     let skip e = (e.epers_name=Epers_Birth) || (e.epers_name=Epers_Baptism) ||
-       not (is_burial_crem_death e) ||
-       not (is_dated_event e) ||
-       CheckItem.strictly_before newdate (Adef.date_of_cdate newe.epers_date)
+     let \< l r = CheckItem.strictly_before (Adef.date_of_cdate l.epers_date)
+                                               (Adef.date_of_cdate r.epers_date)
      in
-     insert_after_or_in_head skip newe es
+     (* new dated event in presence of other dated events in worst case goes to the end *)
+     let insert_pos =
+       list_fold_left_i (fun n acc e ->
+                         if not (is_dated_event e) then acc
+                         else
+                           if e < newe then acc
+                           else
+                             min acc n
+                        )
+                        (List.length es) es
+     in
+     list_insert_after_n insert_pos newe es
   ]
 ;
 
@@ -1376,7 +1436,7 @@ value print_add o_conf base =
     in
     if ext || redisp then UpdateInd.print_update_ind conf base (weights,sp) ""
     else do {
-      let sp = strip_person sp in
+      let (_,sp) = strip_person weights sp in
       match check_person conf base sp with
       [ Some err -> error_person conf base sp err
       | None ->
@@ -1433,7 +1493,7 @@ value print_mod_aux conf base callback =
     if digest = raw_get conf "digest" then
       if ext || redisp then UpdateInd.print_update_ind conf base (ww,p) digest
       else
-        let p = strip_person p in
+        let (ww,p) = strip_person ww p in
         match check_person conf base p with
         [ Some err -> error_person conf base p err
         | None -> callback ww p ]
