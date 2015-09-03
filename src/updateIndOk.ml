@@ -38,7 +38,7 @@ value string_of_event e =
     | Epers_Death  -> "death"
     | Epers_Burial -> "bur"
     | Epers_Cremation -> "cre"
-    | Epers_Name s -> "Name " ^ s
+    | Epers_Name s -> sprintf "Name '%s'" s
     | _ -> "???"
     ]
 ;
@@ -313,9 +313,9 @@ value rec reconstitute_pevents conf ext cnt =
                       loop_witn n witnesses where rec loop_witn n witnesses =
                         if n = 0 then ([c :: witnesses], True)
                         else
-                  let new_witn =
+                          let new_witn =
                             (("", "", 0, Update.Create Neuter None, ""), wk)
-                  in
+                          in
                           let witnesses = [new_witn :: witnesses] in
                           loop_witn (n-1) witnesses
                   | _ ->
@@ -357,7 +357,6 @@ value rec reconstitute_pevents conf ext cnt =
          epers_witnesses = Array.of_list witnesses}
       in
       let (el, ext) = reconstitute_pevents conf ext (cnt + 1) in
-      let (el, ext) = reconstitute_insert_pevent conf ext (cnt +1) el in
       ([ (weight,e) :: el ], ext)
   | _ -> ([], ext) ]
 ;
@@ -496,10 +495,11 @@ value reconstitute_from_pevents pevents ext bi bp de bu =
 
      In this function we restore person info while parsing special events. Also we
      remove some special events if they are empty (they appear because of dedicated controls
-     on the form
+     on the form.
+
+     We shall not pass newly created events there beacuse they will be removed.
    *)
   let is_empty_event (w,e)  =
-    if  (e.epers_name = Epers_Name "" && w=None) then False else
     (match e.epers_name with
        [ Epers_Name "" | Epers_Baptism | Epers_Death | Epers_Burial
        | Epers_Birth -> True
@@ -587,46 +587,6 @@ value reconstitute_from_pevents pevents ext bi bp de bu =
         | _ -> loop l bi bp de bu ] ]
   in
   let (bi, bp, de, bu) = loop pevents bi bp de bu in
-  (* Hack *)
-  (* let pevents = *)
-  (*   if not found_death.val then *)
-  (*     let remove_evt = ref False in *)
-  (*     List.fold_left *)
-  (*       (fun accu ((_,evt) as e) -> *)
-  (*          if not remove_evt.val then *)
-  (*            if evt.epers_name = Epers_Name "" then *)
-  (*              do { remove_evt.val := True; print_endline "event for death killed"; accu } *)
-  (*            else [e :: accu] *)
-  (*          else [e :: accu]) *)
-  (*       [] (List.rev pevents) *)
-  (*   else pevents *)
-  (* in *)
-  (* let pevents = *)
-  (*   if not found_burial.val then *)
-  (*     let remove_evt = ref False in *)
-  (*     List.fold_left *)
-  (*       (fun accu ((_,evt) as e) -> *)
-  (*          if not remove_evt.val then *)
-  (*            if evt.epers_name = Epers_Name "" then *)
-  (*              do { remove_evt.val := True; print_endline "event for burial killed"; accu } *)
-  (*            else [e :: accu] *)
-  (*          else [e :: accu]) *)
-  (*       [] (List.rev pevents) *)
-  (*   else pevents *)
-  (* in *)
-  let pevents =
-    if not ext then
-      let remove_evt = ref False in
-      List.fold_left
-        (fun accu ((_,evt) as e) ->
-           if not remove_evt.val then
-             if evt.epers_name = Epers_Name "" then
-               do { remove_evt.val := True; print_endline "event for (not ext)killed"; accu }
-             else [e :: accu]
-           else [e :: accu])
-        [] (List.rev pevents)
-    else pevents
-  in
 
   (* Il faut gérer le cas où l'on supprime délibérément l'évènement. *)
   let bi =
@@ -742,17 +702,14 @@ value reconstitute_person conf =
     [ (NotDead | DontKnowIfDead, Buried _ | Cremated _) -> DeadDontKnowWhen
     | _ -> death ]
   in
+
   let (events_n_weights, ext) = reconstitute_pevents conf ext 1 in
-  let (events_n_weights, ext) = reconstitute_insert_pevent conf ext 0 events_n_weights in
-  let notes =
-    if first_name = "?" || surname = "?" then ""
-    else only_printable_or_nl (strip_all_trailing_spaces (get conf "notes"))
-  in
-  let psources = only_printable (get conf "src") in
+  (* We will not pass newly generated events to reconstitute_from_pevents because we
+     can't exptract any useful information fro mjust created events *)
+  let (new_events, ext) =
+    reconstitute_insert_pevent conf ext (1+List.length events_n_weights) [] in
+
   (* Mise à jour des évènements principaux. *)
-  let () = printf "before reconstitute from pevents len = %d\n"
-                  (List.length events_n_weights) in
-  let () = print_evs_n_weights events_n_weights in
   let (bi, bp, de, bu, events_n_weights) =
     reconstitute_from_pevents events_n_weights ext
       (Adef.codate_of_od birth, birth_place, birth_note, birth_src)
@@ -760,11 +717,17 @@ value reconstitute_person conf =
       (death, death_place, death_note, death_src)
       (burial, burial_place, burial_note, burial_src)
   in
-  let () = printf "len = %d\n" (List.length events_n_weights) in
-  let () = print_evs_n_weights events_n_weights in
+
+  let events_n_weights = events_n_weights @ new_events in
 
   let ww = List.map fst events_n_weights in
   let pevents = List.map snd events_n_weights in
+
+  let notes =
+    if first_name = "?" || surname = "?" then ""
+    else only_printable_or_nl (strip_all_trailing_spaces (get conf "notes"))
+  in
+  let psources = only_printable (get conf "src") in
 
   let (birth, birth_place, birth_note, birth_src) = bi in
   let (bapt, bapt_place, bapt_note, bapt_src) = bp in
