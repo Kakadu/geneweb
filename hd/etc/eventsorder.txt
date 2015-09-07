@@ -31,17 +31,33 @@ function update_href() {
 
 function on_move_down(x) {
   var $tr = x.parent();
-  var curpos = $("table tr").index($tr);
-  $tr.next("tr").after($tr);
+  //var curpos = $("table tr").index($tr);
+  var can_swap = true;
 
-  update_href();
+  if ($tr.is('[textdate]') ) {
+    // we have textdate field. It means there is event with same date nearby
+    if ($tr.next('tr').attr('textdate') != $tr.attr('textdate') )
+       can_swap = false;
+  }
+  if (can_swap) {
+    $tr.next('tr').after($tr);
+    update_href();
+  }
 }
 function on_move_up(x) {
   var $tr = x.parent();
-  var curpos = $("table tr").index($tr);
-  $tr.prev("tr").before($tr);
 
-  update_href();
+  var can_swap = true;
+
+  if ($tr.is('[textdate]') ) {
+    // we have textdate field. It means there is event with same date nearby
+    if ($tr.prev('tr').attr('textdate') != $tr.attr('textdate') )
+       can_swap = false;
+  }
+  if (can_swap) {
+    $tr.prev("tr").before($tr);
+    update_href();
+  }
 }
 </script>
 
@@ -52,7 +68,7 @@ function on_move_up(x) {
   <h3 class="highlight">[*time line] </h3>
   <table>
     %foreach;pevent;
-      <tr oldpos=%event.pos;>
+      <tr %if;event.has_date;textdate="%event.date" %else %end; oldpos="%event.pos;">
         %if;event.is_reordable;
           <td onclick="on_move_up($(this));">Move up</td>
           <td onclick="on_move_down($(this));">Move down</td>
