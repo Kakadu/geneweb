@@ -2607,7 +2607,15 @@ and eval_bool_event_field
   fun
   [ "has_date" -> p_auth && date <> Adef.codate_None
   | "has_place" -> p_auth && sou base place <> ""
-  | "is_reordable" -> p_auth && (Adef.is_reordable date)
+  | "is_reordable" ->
+     p_auth && ((Adef.is_reordable date) ||
+                  (match date with
+                    [ _ when date = Adef.codate_None -> True
+                    | d ->
+                       let gp = gen_person_of_person p in
+                       list_count (fun e -> e.epers_date = d) gp.pevents > 1
+                    ])
+               )
   | "has_note" -> p_auth && sou base note <> ""
   | "has_src" -> p_auth && sou base src <> ""
   | "has_witnesses" -> p_auth && Array.length w > 0

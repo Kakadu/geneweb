@@ -290,3 +290,4 @@ value list_fold_left_i: (int -> 'acc -> 'a -> 'acc) -> 'acc -> list 'a -> 'acc;
 (** Function [list_insert_after n x xs] inserts [x] between nth and (n+1)th elements
     of the list [xs]  *)
 value list_insert_after_n: int -> 'a -> list 'a -> list 'a;
+value list_count: ('a -> bool) -> list 'a -> int;

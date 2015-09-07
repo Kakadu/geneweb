@@ -3665,3 +3665,7 @@ value list_insert_after_n n x xs =
     in
     helper n [] xs
 ;
+
+value list_count cond xs =
+  List.fold_left (fun acc x -> if cond x then acc+1 else acc) 0  xs
+;
