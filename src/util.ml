@@ -623,9 +623,8 @@ value parent_has_title conf base p =
       fonction de son age.
       Renvoie (dans l'ordre des tests) :
         - Vrai si : magicien ou ami ou la personne est public
-        - Vrai si : la personne est en si_titre, qu'elle ou ses parents
-                    ont au moins un titre et que public_if_title = yes
-                    dans le fichier gwf
+        - Vrai si : la personne est en si_titre, si elle a au moins un
+                    titre et que public_if_title = yes dans le fichier gwf
         - Faux si : la personne n'est pas décédée et private_years > 0
         - Vrai si : la personne est plus agée (en fonction de la date de
                     naissance ou de la date de baptème) que privates_years
@@ -648,7 +647,7 @@ value authorized_age conf base p =
   if conf.wizard || conf.friend || get_access p = Public then True
   else if
     conf.public_if_titles && get_access p = IfTitles &&
-    (nobtit conf base p <> [] || parent_has_title conf base p) then
+    nobtit conf base p <> [] then
     True
   else
     match
@@ -3633,4 +3632,40 @@ value display_options conf =
     | None -> s ]
   in
   s
+;
+
+value list_init count (f: int -> 'a) =
+  let rec helper n xs =
+    (* let () = Printf.printf "list_init, n=%d, len=%d\n%!" n (List.length xs) in *)
+    if n>=0 then helper (n-1) [ (f n) :: xs ]
+    else let () = assert (List.length xs = count) in
+         xs
+  in
+  helper (count-1) []
+;
+
+value list_filter_map f xs =
+  let xs = List.map f xs in
+  let xs = List.filter (fun [ Some _ -> True | None -> False ]) xs in
+  List.map (fun [Some x -> x | None -> failwith "list_filter_map" ]) xs
+;
+
+
+value list_fold_left_i f init xs =
+  let i = ref (-1) in
+  List.fold_left (fun acc x -> let () = incr i in f i.val acc x) init xs
+;
+
+value list_insert_after_n n x xs =
+  if n > List.length xs then failwith "Bad_argument: list_insert_after_n"
+  else
+    let rec helper n left xs =
+      if n>0 then helper (n-1) [ List.hd xs :: left ] (List.tl xs)
+      else List.fold_left (fun acc y -> [ y :: acc ]) [ x :: xs ] left
+    in
+    helper n [] xs
+;
+
+value list_count cond xs =
+  List.fold_left (fun acc x -> if cond x then acc+1 else acc) 0  xs
 ;

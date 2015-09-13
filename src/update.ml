@@ -406,6 +406,7 @@ value print_warning conf base =
         end;
       end
     }
+(*
   | ChangedOrderOfPersonEvents p before after -> do {
       Wserver.wprint "%s\n"
         (capitale (transl conf "changed order of person's events"));
@@ -439,6 +440,7 @@ value print_warning conf base =
         end;
       end
     }
+*)
   | CloseChildren ifam des elder x ->
       let cpl = foi base ifam in
       do {
