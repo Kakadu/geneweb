@@ -9,7 +9,8 @@ require_once('GenewebSaisieReadAPI.php');
 require_once('filters/Filter.cls.php');
 
 //const URL_API = "http://192.168.1.150:2322/";
-const URL_API = "http://vm-swan:2322/";
+//const URL_API = "http://vm-swan:2322/";
+const URL_API = "http://localhost:2322/";
 
 class Request {
 
@@ -99,6 +100,7 @@ class APIController {
                 $api->addFilter($filter);
             }
             $service = $req->gp('service');
+
             if($req->gp('p')){
                 $results = call_user_func_array(array($api, $service), $req->gp('p'));
             }
@@ -246,7 +248,7 @@ class APIController {
     }
 
     public function render(){
-        $req = \request::getInstance();
+        $req = Request::getInstance();
 
         // Services combo
         $content = "<div id='selectbox'><select onchange=\"window.location='#'+$(this).val();$(this).find('option[value=\'\']').attr('selected','selected');\"><option value=''>-- Choisissez une méthode --</option>";
@@ -291,7 +293,8 @@ class APIController {
                 require_once($directory.'/'.$entry);
                 $class = str_replace(".cls.php", "", $entry);
                 $rc = new ReflectionClass("\geneweb\\api\\filters\\".$class);
-                if($rc->isAbstract()) continue;
+                if($rc->isAbstract())
+                    continue;
                 $methods = $rc->getMethods();
                 $p = $req->gp("filters");
                 $content .= "<br/><label><input type='checkbox' name='filters[$class]' value='1' ".($p[$class] == "1" ? "checked='checked'" : "")." ".((count($methods) > 1) ? "onclick=\"($(this).is(':checked') ? $(this).parent().next().show() : $(this).parent().next().hide())\"" : "")."/>".$class."</label>";
@@ -377,13 +380,13 @@ class APIController {
 ?><html>
 <head>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
-<?
+<?php
 $controller = new APIController();
 $controller->run();
 ?>
 </head>
 <body>
-<?
+<?php
 echo $controller->render();
 ?>
 </body>
