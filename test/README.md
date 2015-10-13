@@ -25,6 +25,7 @@ redis-server redis.conf
 NB :
 * redis must be run locally
 * grimaldi.rdb contains samples for connecting Anne BURKE from grimaldi.ged to anneburke.ged
+* to get redis contents we can use `pip install rdbtools` and  `db --command json grimaldi.rdb | python -m json.tool`
 
 ## PHP Web Client
 1. Run a simple LAMP server on test/php_cli directory
