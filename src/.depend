@@ -47,7 +47,7 @@ check_base.cmo: check.cmi def.cmi gwdb.cmi secure.cmi
 check_base.cmx: check.cmx def.cmi gwdb.cmx secure.cmx
 compilation.cmo: def.cmi util.cmi
 compilation.cmx: def.cmi util.cmx
-config.cmi: def.cmi
+config.cmi: def.cmi gwdb.cmi
 consang.cmo: adef.cmi def.cmi gwdb.cmi consang.cmi
 consang.cmx: adef.cmx def.cmi gwdb.cmx consang.cmi
 consang.cmi: def.cmi gwdb.cmi
@@ -266,8 +266,12 @@ perso.cmo: adef.cmi buff.cmo checkItem.cmi config.cmi dag.cmi date.cmi \
 perso.cmx: adef.cmx buff.cmx checkItem.cmx config.cmi dag.cmx date.cmx \
     def.cmi futil.cmx gutil.cmx gwdb.cmx hutil.cmx mutil.cmx name.cmx \
     notes.cmx notesLinks.cmx num.cmx srcfile.cmx templ.cmx templAst.cmi \
-    util.cmx wiki.cmx ../wserver/wserver.cmx perso.cmi
+    util.cmx wiki.cmx ../wserver/wserver.cmx perso.cmi \
+    perso_link.cmx
+perso_link.cmi: gwdb.cmi
+perso_link.cmx: gwdb.cmx gwdb.cmi
 perso.cmi: adef.cmi config.cmi gwdb.cmi
+
 phonygwd.cmo: argl.cmo secure.cmi ../wserver/wserver.cmi
 phonygwd.cmx: argl.cmx secure.cmx ../wserver/wserver.cmx
 place.cmo: adef.cmi config.cmi def.cmi gwdb.cmi hutil.cmi mutil.cmi util.cmi \
