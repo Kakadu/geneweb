@@ -191,3 +191,5 @@ value dsk_person_of_person : person -> Dbdisk.dsk_person;
 
 value apply_base1 : base -> (Dbdisk.dsk_base -> unit) -> unit;
 value apply_base2 : base -> (Db2disk.db2 -> unit) -> unit;
+
+value printfn : format4  'a unit string unit -> 'a;

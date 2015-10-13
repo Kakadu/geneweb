@@ -7,7 +7,7 @@ module Mext_read = Api_saisie_read_piqi_ext
 module MLink = Api_link_tree_piqi
 module MLinkext = Api_link_tree_piqi_ext
 
-
+open Printf
 open Config
 open Def
 open Gwdb
@@ -15,7 +15,7 @@ open Util
 open Api_def
 open Api_util
 
-
+let printfn fmt = Printf.kprintf (Printf.printf "%s\n%!") fmt;;
 
 (**/**) (* Conversion de dates *)
 
@@ -1524,7 +1524,8 @@ let print_person_tree conf base =
 
 (* Graphe d'ascendance *)
 
-let build_graph_asc conf base p max_gen base_loop =
+let build_graph_asc conf base p max_gen base_loop : (Mread.Node.t list * Mread.Edge.t list * _ list) =
+  let () = print_endline "build_graph_asc" in
 (*
   let () = load_ascends_array base in
   let () = load_unions_array base in
@@ -1561,7 +1562,7 @@ let build_graph_asc conf base p max_gen base_loop =
         (List.rev !nodes, List.rev !edges, List.rev !families)
     | (p, gen) :: l ->
         try
-          let _ = Hashtbl.find ht (get_key_index p) in
+          let _ = Hashtbl.find ht (get_key_index p)  in
           loop l nodes edges families
         with Not_found ->
           begin
@@ -1572,6 +1573,7 @@ let build_graph_asc conf base p max_gen base_loop =
                 Hashtbl.add ht (get_key_index p) true;
                 match get_parents p with
                 | Some ifam ->
+                    let () = print_endline "parents are gotten" in
                     let cpl = foi base ifam in
                     let fath = poi base (get_father cpl) in
                     let moth = poi base (get_mother cpl) in
@@ -1598,6 +1600,7 @@ let build_graph_asc conf base p max_gen base_loop =
                               match Perso_link.get_parents_link base_prefix ip with
                               | Some family ->
                                   begin
+                                  let () = printf "Perso_link.get_parents_link %s %d = Some _\n%!"  base_prefix (Adef.int_of_iper ip) in
                                   let ifath = Adef.iper_of_int (Int32.to_int family.MLink.Family.ifath) in
                                   let imoth = Adef.iper_of_int (Int32.to_int family.MLink.Family.imoth) in
                                   let fam_base_prefix = family.MLink.Family.baseprefix in
@@ -1619,7 +1622,9 @@ let build_graph_asc conf base p max_gen base_loop =
                                       loop_parents nodes edges l
                                   | _ -> loop_parents nodes edges l
                                   end
-                              | None -> loop_parents nodes edges l
+                              | None ->
+                                 let () = printf "Perso_link.get_parents_link %s %d = None\n%!"  base_prefix (Adef.int_of_iper ip) in
+                                 loop_parents nodes edges l
                       in
                       loop_parents nodes edges [(conf.bname, p, gen)]
                     in
@@ -1638,6 +1643,7 @@ let build_graph_asc conf base p max_gen base_loop =
 (* Graphe de descendance *)
 
 let build_graph_desc conf base p max_gen base_loop =
+  let () = printf "build_graph_desc%!\n" in
 (*
   let () = load_descends_array base in
   let () = load_unions_array base in
@@ -1668,6 +1674,7 @@ let build_graph_desc conf base p max_gen base_loop =
   in
 *)
   let rec loop l nodes edges families =
+    printfn "loop with l.len = %d" (List.length l);
     match l with
     | [] ->
         (* On retourne la liste pour avoir les noeuds dans l'ordre *)
@@ -1684,10 +1691,11 @@ let build_graph_desc conf base p max_gen base_loop =
             else
               begin
                 Hashtbl.add ht (get_key_index p) true;
-                let ifam = get_family p in
+                let ifam : Adef.ifam array = get_family p in
                 let l =
                   List.fold_left
                     (fun accu ifam  ->
+                      let () = printf "A\n%!" in
                       let fam = foi base ifam in
                       let sp = poi base (Gutil.spouse (get_key_index p) fam) in
                       let children =
@@ -1713,21 +1721,26 @@ let build_graph_desc conf base p max_gen base_loop =
                               accu children
                           in
                           (* lien inter arbre *)
-                          let family_link =
+                          let family_link : Api_link_tree_piqi.Family.t list =
                             Perso_link.get_families_of_parents
                               conf.command (get_key_index p) (get_key_index sp)
                           in
+                          let () = printfn "family_link len = %d" (List.length family_link) in
                           let children_link =
                             List.fold_right
                               (fun fam_link accu ->
+                                let () = printf "B\n%!" in
+
                                 List.fold_right
                                   (fun c_link accu ->
+                                    let () = printf "C\n%!" in
                                     let baseprefix = c_link.MLink.Person_link.baseprefix in
                                     let ip_c =
                                       Adef.iper_of_int (Int32.to_int c_link.MLink.Person_link.ip)
                                     in
                                     match Perso_link.get_person_link baseprefix ip_c with
                                     | Some c_link ->
+                                        let () = printf "got person link\n%!" in
                                         let can_merge =
                                           Perso_link.can_merge_child conf.command
                                             (get_children fam) c_link
@@ -1757,6 +1770,7 @@ let build_graph_desc conf base p max_gen base_loop =
                       else accu)
                     l (Array.to_list ifam)
                 in
+                let () = printfn "List.length l = %d" (List.length l) in
                 let l_link =
                   let ip = get_key_index p in
                   let base_prefix = conf.command in
@@ -1776,6 +1790,7 @@ let build_graph_desc conf base p max_gen base_loop =
                                conf.command ip fam_link.MLink.Family.baseprefix
                            with
                            | Some p ->
+                              printfn "got some";
                                let ip = Adef.iper_of_int (Int32.to_int p.MLink.Person.ip) in
                                (ifath, imoth, if ip = ifath then imoth else ifath)
                            | None -> (ifath, imoth, if ip = ifath then imoth else ifath)
@@ -1834,6 +1849,8 @@ let build_graph_desc conf base p max_gen base_loop =
                          | None -> accu)
                     [] families
                 in
+                let () = printfn "List.length l_link = %d" (List.length l_link) in
+
                 let l = l @ l_link in
                 loop l nodes edges families
               end
@@ -1848,7 +1865,7 @@ let build_graph_desc conf base p max_gen base_loop =
 
 
 (* ********************************************************************* *)
-(*  [Fonc] print_tree : conf -> base -> todo                             *)
+(*  [Fonc] print_tree : conf -> base -> unit                             *)
 (** [Description] :
     [Args] :
       - conf  : configuration de la base

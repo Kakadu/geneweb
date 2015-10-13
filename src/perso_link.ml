@@ -6,7 +6,7 @@
 module MLink = Api_link_tree_piqi;
 module MLinkext = Api_link_tree_piqi_ext;
 
-
+open Printf;
 open Config;
 open Def;
 open Gwdb;
@@ -339,6 +339,7 @@ value make_efam_link conf base ip fam_link =
     [Rem] : Exporté en clair hors de ce module.                               *)
 (* ************************************************************************** *)
 value get_person_link_with_base base_prefix ip base_distante =
+  let () = printfn "get_person_link_with_base ip=%d" (Adef.int_of_iper ip) in
   let base_prefix = Link.chop_base_prefix base_prefix in
   let base_distante = Link.chop_base_prefix base_distante in
   try Some (Hashtbl.find Link.ht_person_cache (base_prefix, ip)) with
@@ -370,6 +371,9 @@ value get_person_link_with_base base_prefix ip base_distante =
     [Rem] : Exporté en clair hors de ce module.                               *)
 (* ************************************************************************** *)
 value get_person_link base_prefix ip =
+  let () = printf "get_person_link base=%s ip=%d\n%!" base_prefix
+                  (Adef.int_of_iper ip)
+  in
   let base_prefix = Link.chop_base_prefix base_prefix in
   try Some (Hashtbl.find Link.ht_person_cache (base_prefix, ip)) with
   [ Not_found ->
@@ -545,6 +549,9 @@ value get_family_link base_prefix ip =
     [Rem] : Exporté en clair hors de ce module.                               *)
 (* ************************************************************************** *)
 value get_families_of_parents base_prefix ip isp =
+  let () = printf "get_families_of_parents ip=%d isp=%d\n%!"
+                  (Adef.int_of_iper ip) (Adef.int_of_iper isp)
+  in
   let lip = get_persons_link base_prefix ip in
   let lisp = get_persons_link base_prefix isp in
   List.fold_left

@@ -1556,3 +1556,5 @@ value gen_person_misc_names base p nobtit =
 value person_misc_names base p nobtit =
   gen_gen_person_misc_names base (gen_person_of_person p) (nobtit p) nobtit
 ;
+
+value printfn fmt = Printf.kprintf (Printf.printf "%s\n%!") fmt;
