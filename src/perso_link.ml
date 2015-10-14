@@ -592,12 +592,12 @@ value get_families_of_parents' base_prefix ip isp =
 ;
 
 value get_families_of_parents base_prefix ip isp =
-  let xs =
+  let xs = get_families_of_parents' base_prefix ip isp in
   let () = printfn "get_families_of_parents base='%s' ip=%d isp=%d returns %d items"
                   base_prefix (Adef.int_of_iper ip) (Adef.int_of_iper isp)
                   (List.length xs)
   in
-  get_families_of_parents' base_prefix ip isp
+  xs
 ;
 
 (* ************************************************************************** *)
