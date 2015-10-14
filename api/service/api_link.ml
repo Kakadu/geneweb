@@ -504,6 +504,7 @@ let get_families_desc conf base ip ip_spouse from_gen_desc nb_desc =
 
 
 let get_link_tree_curl conf request basename bname ip s s2 nb_asc from_gen_desc nb_desc =
+  let () = printfn "get_link_tree_curl s= %s, s2= %s" s s2 in
   let host =
     let rec loop api_servers =
       match api_servers with
@@ -841,6 +842,7 @@ let print_link_tree conf base =
                   (fun (accu_fam, accu_pers, accu_conn) x ->
                     match Link.nsplit x ':' with
                     | [_; bname_link; id_link; "spouse-children"; id_link_spouse] ->
+                        let () = printfn "get spouse_children with id_link=%s, id_link_spouse=%s" id_link id_link_spouse in
                         let pl =
                           findKeyBySourcenameAndIdGlinks redis bname_link
                             (int_of_string id_link)

@@ -497,8 +497,13 @@ value get_mother_link base_prefix ip =
 (* ************************************************************************** *)
 value get_family_correspondance base_prefix ip =
   let base_prefix = Link.chop_base_prefix base_prefix in
+  let () = printfn "get_family_correspondance_base base='%s' ip=%d"
+                   base_prefix
+                   (Adef.int_of_iper ip)
+  in
   try Hashtbl.find Link.ht_families_cache (base_prefix, ip) with
   [ Not_found ->
+      let () = printfn "Not_found" in
       try
         let l = Hashtbl.find_all Link.ht_corresp (base_prefix, ip) in
         List.fold_left
@@ -519,10 +524,11 @@ value get_family_correspondance base_prefix ip =
     [Retour] : Family.t list
     [Rem] : Exporté en clair hors de ce module.                               *)
 (* ************************************************************************** *)
-value get_family_link base_prefix ip =
+value get_family_link' base_prefix ip =
   let base_prefix = Link.chop_base_prefix base_prefix in
   try
     let l = get_family_correspondance base_prefix ip in
+    let () = printfn "correspondance returns len = %d" (List.length l) in
     List.fold_right
       (fun fam accu ->
         let (base_prefix, ifam) =
@@ -534,6 +540,14 @@ value get_family_link base_prefix ip =
         with [ Not_found -> accu ])
       l []
   with [ Not_found -> [] ]
+;
+
+value get_family_link base_prefix ip =
+  let xs = get_family_link' base_prefix ip  in
+  let () = printfn "get_family_link base='%s' ip=%d return %d items"
+                   base_prefix (Adef.int_of_iper ip) (List.length xs)
+  in
+  xs
 ;
 
 
@@ -548,10 +562,7 @@ value get_family_link base_prefix ip =
     [Retour] : Néant
     [Rem] : Exporté en clair hors de ce module.                               *)
 (* ************************************************************************** *)
-value get_families_of_parents base_prefix ip isp =
-  let () = printf "get_families_of_parents ip=%d isp=%d\n%!"
-                  (Adef.int_of_iper ip) (Adef.int_of_iper isp)
-  in
+value get_families_of_parents' base_prefix ip isp =
   let lip = get_persons_link base_prefix ip in
   let lisp = get_persons_link base_prefix isp in
   List.fold_left
@@ -580,6 +591,14 @@ value get_families_of_parents base_prefix ip isp =
     [] lip
 ;
 
+value get_families_of_parents base_prefix ip isp =
+  let xs =
+  let () = printfn "get_families_of_parents base='%s' ip=%d isp=%d returns %d items"
+                  base_prefix (Adef.int_of_iper ip) (Adef.int_of_iper isp)
+                  (List.length xs)
+  in
+  get_families_of_parents' base_prefix ip isp
+;
 
 (* ************************************************************************** *)
 (*  [Fonc] get_children_of_fam : string -> ifam -> Person.t list         *)

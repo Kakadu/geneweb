@@ -44,16 +44,6 @@ api.out:
 	$(OCAMLOPT) -package piqirun.ext -c $<
 
 api.opt: api_piqi.cmx api_piqi_ext.cmx api_stats_piqi.cmx api_stats_piqi_ext.cmx api_app_piqi.cmx api_app_piqi_ext.cmx api_saisie_read_piqi.cmx api_saisie_read_piqi_ext.cmx api_saisie_write_piqi.cmx api_saisie_write_piqi_ext.cmx
-	# $(OCAMLOPT) -package piqirun.ext -c api_piqi.ml
-	# $(OCAMLOPT) -package piqirun.ext -c api_piqi_ext.ml
-	# $(OCAMLOPT) -package piqirun.ext -c api_stats_piqi.ml
-	# $(OCAMLOPT) -package piqirun.ext -c api_stats_piqi_ext.ml
-	# $(OCAMLOPT) -package piqirun.ext -c api_app_piqi.ml
-	# $(OCAMLOPT) -package piqirun.ext -c api_app_piqi_ext.ml
-	# $(OCAMLOPT) -package piqirun.ext -c api_saisie_read_piqi.ml
-	# $(OCAMLOPT) -package piqirun.ext -c api_saisie_read_piqi_ext.ml
-	# $(OCAMLOPT) -package piqirun.ext -c api_saisie_write_piqi.ml
-	# $(OCAMLOPT) -package piqirun.ext -c api_saisie_write_piqi_ext.ml
 # Compilé dans le Makefile de src
 #	$(OCAMLOPT) -package piqirun.ext -c api_link_tree_piqi.ml
 #	$(OCAMLOPT) -package piqirun.ext -c api_link_tree_piqi_ext.ml

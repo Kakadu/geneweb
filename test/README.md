@@ -14,18 +14,18 @@
 ```
 redis-server redis.conf
 ```
-4. Create 2 tests databases (with gwsetup utility): 
-    * "grimaldi" with grimladi.ged 
-    * "anneburke" with anneburke.ged 
-4. Run the API with tree-links options : 
-``` 
-/your/home/geneweb/api/gwd_api -hd /your/home/geneweb/distribution/gw -bd  /your/home/geneweb/distribution/bases -max_clients 30 -sig sig_file -redis localhost -redis_p 6379 -links_tree_url ^[0-9a-z]:localhost:2322 -p 2322 
+4. Create 2 tests databases (with gwsetup utility):
+    * "grimaldi" with grimladi.ged
+    * "anneburke" with anneburke.ged
+4. Run the API with tree-links options :
+```
+/your/home/geneweb/api/gwd_api -hd /your/home/geneweb/distribution/gw -bd  /your/home/geneweb/distribution/bases -max_clients 30 -sig sig_file -redis localhost -redis_p 6379 -links_tree_url ^[0-9a-z]:localhost:2322 -p 2322
 ```
 
 NB :
 * redis must be run locally
 * grimaldi.rdb contains samples for connecting Anne BURKE from grimaldi.ged to anneburke.ged
-* to get redis contents we can use `pip install rdbtools` and  `db --command json grimaldi.rdb | python -m json.tool`
+* to get redis contents we can use `pip install rdbtools` and  `rdb --command json grimaldi.rdb | python -m json.tool`
 
 ## PHP Web Client
 1. Run a simple LAMP server on test/php_cli directory
