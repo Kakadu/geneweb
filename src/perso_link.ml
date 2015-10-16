@@ -495,12 +495,8 @@ value get_mother_link base_prefix ip =
     [Retour] : Family_link.t list
     [Rem] : Exporté en clair hors de ce module.                               *)
 (* ************************************************************************** *)
-value get_family_correspondance base_prefix ip =
+value get_family_correspondance' base_prefix ip =
   let base_prefix = Link.chop_base_prefix base_prefix in
-  let () = printfn "get_family_correspondance_base base='%s' ip=%d"
-                   base_prefix
-                   (Adef.int_of_iper ip)
-  in
   try Hashtbl.find Link.ht_families_cache (base_prefix, ip) with
   [ Not_found ->
       let () = printfn "Not_found" in
@@ -514,6 +510,25 @@ value get_family_correspondance base_prefix ip =
       with [ Not_found -> [] ] ]
 ;
 
+value get_family_correspondance base_prefix ip =
+  let xs = get_family_correspondance' base_prefix ip in
+  let () = printfn "get_family_correspondance base='%s' ip=%d, ans len=%d"
+                   base_prefix
+                   (Adef.int_of_iper ip) (List.length xs)
+  in
+  xs
+;
+
+value describe_fam base ifam =
+  let b = open_base base in
+  let fam = gen_couple_of_couple (foi b ifam) in
+  let mom = gen_person_of_person (poi b (Adef.mother fam)) in
+  let dad = gen_person_of_person (poi b (Adef.father fam)) in
+  let f gp = sprintf "%s %s" (sou b gp.first_name) (sou b gp.surname) in
+  let ans = sprintf "'%s' '%s'" (f dad) (f mom) in
+  let () = close_base b in
+  ans
+;
 
 (* ************************************************************************** *)
 (*  [Fonc] get_family_link : string -> iper -> Family.t list             *)
@@ -528,13 +543,15 @@ value get_family_link' base_prefix ip =
   let base_prefix = Link.chop_base_prefix base_prefix in
   try
     let l = get_family_correspondance base_prefix ip in
-    let () = printfn "correspondance returns len = %d" (List.length l) in
     List.fold_right
       (fun fam accu ->
         let (base_prefix, ifam) =
           (fam.MLink.Family_link.baseprefix,
            Adef.ifam_of_int (Int32.to_int fam.MLink.Family_link.ifam))
         in
+        let () = printfn "ifam=%d: %s"
+                         (Adef.int_of_ifam ifam) (describe_fam base_prefix ifam) in
+
         let base_prefix = Link.chop_base_prefix base_prefix in
         try [Hashtbl.find Link.ht_family_cache (base_prefix, ifam) :: accu]
         with [ Not_found -> accu ])

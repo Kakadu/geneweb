@@ -3,7 +3,7 @@
 module MLink = Api_link_tree_piqi
 module MLinkext = Api_link_tree_piqi_ext
 
-
+open Printf
 open Config
 open Def
 open Gwdb
@@ -498,7 +498,17 @@ let get_families_desc conf base ip ip_spouse from_gen_desc nb_desc =
     loop_desc ipl []
 ;;
 
-
+let string_of_link_tree_params data =
+  sprintf
+    "base='%s' ip=%s ref_person='%s' ref_person2='%s' nb_asc=%s from_gen_desc=%s nb_desc=%s"
+    data.MLink.Link_tree_params.basename
+    (match data.MLink.Link_tree_params.ip with Some x -> Int32.to_string x | _ -> "none")
+    (match data.MLink.Link_tree_params.ref_person with Some s->s | _ -> "none")
+    (match data.MLink.Link_tree_params.ref_person with Some s->s | _ -> "none")
+    (Int32.to_string data.MLink.Link_tree_params.nb_asc)
+    (Int32.to_string data.MLink.Link_tree_params.from_gen_desc)
+    (Int32.to_string data.MLink.Link_tree_params.nb_desc)
+;;
 
 (**/**)
 
@@ -528,6 +538,7 @@ let get_link_tree_curl conf request basename bname ip s s2 nb_asc from_gen_desc 
       nb_desc = Int32.of_int nb_desc;
     })
   in
+  let () = printfn "data = %s" (string_of_link_tree_params data) in
   let data = MLinkext.gen_link_tree_params data `pb in
   let url =
     Printf.sprintf
