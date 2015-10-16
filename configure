@@ -37,6 +37,7 @@ else
     exit 1
 fi
 
+ocamlfind query yojson || exit 1
 D_CAMLP5D=`ocamlfind query camlp5`/
 D_MYSQL=`ocamlfind query mysql`/
 D_OCURL=`ocamlfind query curl`/
