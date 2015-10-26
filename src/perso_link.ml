@@ -727,7 +727,7 @@ value can_merge_family base_prefix ip fam fam_link (_, _, isp) =
     [Retour] : Vrai si on peut merger, faux sinon.
     [Rem] : Exporté en clair hors de ce module.                               *)
 (* ************************************************************************** *)
-value can_merge_child base_prefix children c_link =
+value can_merge_child' base_prefix children c_link =
   let from_baseprefix = Link.chop_base_prefix base_prefix in
   let ip = Adef.iper_of_int (Int32.to_int c_link.MLink.Person.ip) in
   let base_prefix =
@@ -737,7 +737,8 @@ value can_merge_child base_prefix children c_link =
     match children with
     [ [] -> False
     | [from_ip :: children] ->
-        try
+       try
+         let _: Hashtbl.t (string * Def.iper) (string * Def.iper)  = Link.ht_corresp in
           let (to_baseprefix, to_ip) =
             Hashtbl.find Link.ht_corresp (from_baseprefix, from_ip)
           in
@@ -745,7 +746,15 @@ value can_merge_child base_prefix children c_link =
         with [ Not_found -> loop children ] ]
 ;
 
-
+value can_merge_child base_prefix (children: array Def.iper) c_link =
+  let ans = can_merge_child' base_prefix children c_link in
+  let ipers = String.concat " " (List.map Adef.string_of_iper (Array.to_list children)) in
+  let () = printfn "Link.ht_corresp:" in
+  let () = Hashtbl.iter (fun (s1,ip1) (s2, ip2) ->
+                         printfn "\t(%s,%d) -> (%s,%d)" s1 (Adef.int_of_iper ip1)  s2 (Adef.int_of_iper ip2)) Link.ht_corresp in
+  let () = printfn "can_merge_child %s %s _ = %b" base_prefix ipers ans in
+  ans
+;
 (**/**)
 
 

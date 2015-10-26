@@ -124,18 +124,17 @@ class APIController {
                         .results {
                             border:1px solid gray;
                             background-color: #e9e9e9;
-                            margin-bottom:40px;
-                            padding-left:5px;
+                            position: absolute;
+                            width: 60%;
+                            height: 100%;
+                            right: 5px;
+                            overflow-y: scroll;
                         }
 
                         .results h2{
                             color:red;
                         }
 
-                        .results pre {
-                            height:400px;
-                            overflow:auto;
-                        }
 
                         .request {
                             border:1px solid gray;

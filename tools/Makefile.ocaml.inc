@@ -3,4 +3,5 @@ MYSQL=
 OCURL=
 OREDIS=
 RE=
-LREDIS=~/local_devel/ocaml-redis/_build/src/
+LREDIS=/home/kakadu/prog/redis-geneweb/_build/src
+

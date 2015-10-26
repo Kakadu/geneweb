@@ -52,6 +52,7 @@ external int_of_ifam : ifam -> int = "%identity";
 external ifam_of_int : int -> ifam = "%identity";
 external int_of_istr : istr -> int = "%identity";
 external istr_of_int : int -> istr = "%identity";
+value string_of_iper : iper -> string;
 
 exception Request_failure of string;
 
