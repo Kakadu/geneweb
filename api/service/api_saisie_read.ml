@@ -3101,6 +3101,15 @@ let build_graph_asc_full conf base p max_gen =
 ;;
 
 
+module IntPairMap =
+  Map.Make(struct
+              type t = int64*int64
+              let compare: t -> t -> int = fun (x1,y1) (x2,y2) ->
+                let r = compare x1 x2 in
+                if r = 0 then compare y1 y2
+                else r
+            end)
+
 (* Graphe de descendance (api.proto) *)
 
 let build_graph_desc_full' conf base p max_gen =
@@ -3118,7 +3127,14 @@ let build_graph_desc_full' conf base p max_gen =
     (* printfn "  myhash ('%s',%d,%d) = %d" prefix (Adef.int_of_iper index) factor ans; *)
     ans
   in
-  let edges_mem: (int,int) Hashtbl.t = Hastbl.create 37 in
+
+  let maybe_append refs x =
+    match x with
+    | Some v -> refs := v :: !refs
+    | None -> ()
+  in
+
+  let edges_mem: Mread.Edge.t IntPairMap.t ref = ref IntPairMap.empty in
   let create_edge factor_from baseprefix_from p_from factor_to baseprefix_to p_to =
     (* Pour les liens inter arbres, on rend l'id unique avec *)
     (* le prefix de la base et l'index de la personne.       *)
@@ -3128,25 +3144,38 @@ let build_graph_desc_full' conf base p max_gen =
     let id_to =
       Int64.of_int (myhash (baseprefix_to, get_key_index p_to, factor_to))
     in
-    printfn "create edge %s -> %s" (Int64.to_string id_from) (Int64.to_string id_to);
-    Mread.Edge.({
-      from_node = id_from;
-      to_node = id_to;
-    })
+
+    try let _ = IntPairMap.find (id_from,id_to) !edges_mem in
+        (* already added *)
+        None
+    with Not_found ->
+      let () = printfn "create edge %s -> %s" (Int64.to_string id_from) (Int64.to_string id_to) in
+      let e = Mread.Edge.({ from_node = id_from; to_node = id_to; }) in
+      let () = printf "********* adding (%Ld,%Ld) to edges_mem map\n" id_from id_to in
+      let () = edges_mem := IntPairMap.add (id_from,id_to) e !edges_mem in
+      Some e
   in
+
+  let nodes_mem: (int, Mread.Node_full.t) Hashtbl.t = Hashtbl.create 97 in
   let create_node p ifam gen more_info base_prefix factor =
     (* Pour les liens inter arbres, on rend l'id unique avec *)
     (* le prefix de la base et l'index de la personne.       *)
     let uniq_id = myhash (base_prefix, get_key_index p, factor) in
-    printfn "create_node '%s' unique_id=%d" (string_of_graph_more_info more_info) uniq_id;
-    let id = Int64.of_int uniq_id in
-    let p = pers_to_piqi_person_tree_full conf base p more_info gen max_gen base_prefix in
-    let ifam = Int64.of_int (Adef.int_of_ifam ifam) in
-    Mread.Node_full.({
-      id = id;
-      person = p;
-      ifam = Some ifam;
-    })
+    try let _ = Hashtbl.find nodes_mem uniq_id in
+        None
+    with Not_found ->
+      let () = printfn "create_node '%s' unique_id=%d" (string_of_graph_more_info more_info) uniq_id in
+      let id = Int64.of_int uniq_id in
+      let p = pers_to_piqi_person_tree_full conf base p more_info gen max_gen base_prefix in
+      let ifam = Int64.of_int (Adef.int_of_ifam ifam) in
+      let ans = Mread.Node_full.({
+        id = id;
+        person = p;
+        ifam = Some ifam;
+      })
+      in
+      let () = Hashtbl.add nodes_mem uniq_id ans in
+      Some ans
   in
   let create_family ifam families =
     if p_getenv conf.env "full_infos" = Some "1" then
@@ -3208,8 +3237,8 @@ let build_graph_desc_full' conf base p max_gen =
                   let children =
                     List.map (poi base) (Array.to_list (get_children fam))
                   in
-                  nodes := create_node sp ifam gen Spouse conf.command sp_factor :: !nodes;
-                  edges := create_edge factor conf.command p sp_factor conf.command sp :: !edges;
+                  maybe_append nodes (create_node sp ifam gen Spouse conf.command sp_factor);
+                  maybe_append edges (create_edge factor conf.command p sp_factor conf.command sp);
                   if gen <> max_gen then
                     begin
                       List.iter
@@ -3223,9 +3252,9 @@ let build_graph_desc_full' conf base p max_gen =
                               i
                             with Not_found -> Hashtbl.add ht (get_key_index c) 1; 1
                           in
-                          nodes := create_node c ifam gen Children conf.command c_factor :: !nodes;
-                          edges := create_edge factor conf.command p c_factor conf.command c :: !edges;
-                          edges := create_edge sp_factor conf.command sp c_factor conf.command c :: !edges)
+                          maybe_append nodes (create_node c ifam gen Children conf.command c_factor);
+                          maybe_append edges (create_edge factor conf.command p c_factor conf.command c);
+                          maybe_append edges (create_edge sp_factor conf.command sp c_factor conf.command c) )
                         children;
                       create_family ifam families;
                       let child_local =
@@ -3317,9 +3346,9 @@ let build_graph_desc_full' conf base p max_gen =
                                                       i
                                                     with Not_found -> Hashtbl.add ht (baseprefix, get_key_index c) 1; 1
                                                   in
-                                                  nodes := create_node c ifam gen Children baseprefix c_factor :: !nodes;
-                                                  edges := create_edge factor base_prefix p c_factor baseprefix c :: !edges;
-                                                  edges := create_edge sp_factor baseprefix sp c_factor baseprefix c :: !edges;
+                                                  maybe_append nodes (create_node c ifam gen Children baseprefix c_factor);
+                                                  maybe_append edges (create_edge factor base_prefix p c_factor baseprefix c);
+                                                  maybe_append edges (create_edge sp_factor baseprefix sp c_factor baseprefix c);
                                                   (baseprefix, c, gen + 1) :: accu
                                             | None -> accu)
                                           accu fam_link.MLink.Family.children)
@@ -3394,8 +3423,8 @@ let build_graph_desc_full' conf base p max_gen =
                                        with Not_found -> Hashtbl.add ht (baseprefix, get_key_index sp) 1; 1
                                      in
                                      printfn "Linked spouse is %s" (string_of_person sp);
-                                     nodes := create_node sp ifam gen Spouse baseprefix sp_factor :: !nodes;
-                                     edges := create_edge factor base_prefix p sp_factor baseprefix sp :: !edges;
+                                     maybe_append nodes (create_node sp ifam gen Spouse baseprefix sp_factor);
+                                     maybe_append edges (create_edge factor base_prefix p sp_factor baseprefix sp);
                                      if gen <> max_gen then
                                        begin
                                          let family_link =
@@ -3436,9 +3465,9 @@ let build_graph_desc_full' conf base p max_gen =
                                                            i
                                                          with Not_found -> Hashtbl.add ht (baseprefix, get_key_index c) 1; 1
                                                        in
-                                                       nodes := create_node c ifam gen Children baseprefix c_factor :: !nodes;
-                                                       edges := create_edge factor base_prefix p c_factor baseprefix c :: !edges;
-                                                       edges := create_edge sp_factor baseprefix sp c_factor baseprefix c :: !edges;
+                                                       maybe_append nodes (create_node c ifam gen Children baseprefix c_factor);
+                                                       maybe_append edges (create_edge factor base_prefix p c_factor baseprefix c);
+                                                       maybe_append edges (create_edge sp_factor baseprefix sp c_factor baseprefix c);
                                                        (baseprefix, c, gen + 1) :: accu
                                                    | None -> accu)
                                                  accu fam_link.MLink.Family.children)
@@ -3458,7 +3487,7 @@ let build_graph_desc_full' conf base p max_gen =
             loop l
           end
   in
-  nodes := create_node p (Adef.ifam_of_int (-1)) 1 Root conf.command 1 :: !nodes;
+  maybe_append nodes (create_node p (Adef.ifam_of_int (-1)) 1 Root conf.command 1);
   loop [(p, 1)];
   (* On retourne la liste pour avoir les noeuds dans l'ordre *)
   (* la référence, suivi du père suivi, puis de la mère ...  *)
