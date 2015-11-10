@@ -339,7 +339,7 @@ value make_efam_link conf base ip fam_link =
     [Rem] : Exporté en clair hors de ce module.                               *)
 (* ************************************************************************** *)
 value get_person_link_with_base base_prefix ip base_distante =
-  let () = printfn "get_person_link_with_base ip=%d" (Adef.int_of_iper ip) in
+  (* let () = printfn "get_person_link_with_base ip=%d" (Adef.int_of_iper ip) in *)
   let base_prefix = Link.chop_base_prefix base_prefix in
   let base_distante = Link.chop_base_prefix base_distante in
   try Some (Hashtbl.find Link.ht_person_cache (base_prefix, ip)) with
@@ -512,10 +512,10 @@ value get_family_correspondance' base_prefix ip =
 
 value get_family_correspondance base_prefix ip =
   let xs = get_family_correspondance' base_prefix ip in
-  let () = printfn "get_family_correspondance base='%s' ip=%d, ans len=%d"
-                   base_prefix
-                   (Adef.int_of_iper ip) (List.length xs)
-  in
+  (* let () = printfn "get_family_correspondance base='%s' ip=%d, ans len=%d" *)
+  (*                  base_prefix *)
+  (*                  (Adef.int_of_iper ip) (List.length xs) *)
+  (* in *)
   xs
 ;
 
@@ -549,8 +549,8 @@ value get_family_link' base_prefix ip =
           (fam.MLink.Family_link.baseprefix,
            Adef.ifam_of_int (Int32.to_int fam.MLink.Family_link.ifam))
         in
-        let () = printfn "ifam=%d: %s"
-                         (Adef.int_of_ifam ifam) (describe_fam base_prefix ifam) in
+        (* let () = printfn "ifam=%d: %s" *)
+        (*                  (Adef.int_of_ifam ifam) (describe_fam base_prefix ifam) in *)
 
         let base_prefix = Link.chop_base_prefix base_prefix in
         try [Hashtbl.find Link.ht_family_cache (base_prefix, ifam) :: accu]
@@ -739,20 +739,25 @@ value can_merge_child' base_prefix children c_link =
     | [from_ip :: children] ->
        try
          let _: Hashtbl.t (string * Def.iper) (string * Def.iper)  = Link.ht_corresp in
-          let (to_baseprefix, to_ip) =
-            Hashtbl.find Link.ht_corresp (from_baseprefix, from_ip)
-          in
-          (to_baseprefix = base_prefix && to_ip = ip) || loop children
-        with [ Not_found -> loop children ] ]
+         let () = printf "\t\t try_find ht_corresp ('%s', %d)\n%!" from_baseprefix (Adef.int_of_iper from_ip) in
+         let (to_baseprefix, to_ip) =
+           Hashtbl.find Link.ht_corresp (from_baseprefix, from_ip)
+         in
+         let () = printf "\t\t found ('%s',%d)\n%!" to_baseprefix (Adef.int_of_iper to_ip) in
+         (to_baseprefix = base_prefix && to_ip = ip) || loop children
+       with [ Not_found ->
+              let () = printf "\t\t Not_found\n" in
+              loop children ] ]
 ;
 
 value can_merge_child base_prefix (children: array Def.iper) c_link =
+  let () = printfn "can_merge_child" in
   let ans = can_merge_child' base_prefix children c_link in
   let ipers = String.concat " " (List.map Adef.string_of_iper (Array.to_list children)) in
   let () = printfn "Link.ht_corresp:" in
   let () = Hashtbl.iter (fun (s1,ip1) (s2, ip2) ->
                          printfn "\t(%s,%d) -> (%s,%d)" s1 (Adef.int_of_iper ip1)  s2 (Adef.int_of_iper ip2)) Link.ht_corresp in
-  let () = printfn "can_merge_child %s %s _ = %b" base_prefix ipers ans in
+  let () = printfn "can_merge_child '%s' [|%s|] _ = %b" base_prefix ipers ans in
   ans
 ;
 (**/**)
