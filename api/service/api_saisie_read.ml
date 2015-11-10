@@ -3303,8 +3303,10 @@ let build_graph_desc_full' conf base p max_gen =
                                   in
                                   let children_link =
                                     ListLabels.fold_left ~init:l family_link
-                                      ~f:(fun accu fam_link ->
-                                        let () = printf "iterating over children in fam_link %s\n%!" (string_of_famlink fam_link) in
+                                    ~f:(fun accu fam_link ->
+                                        let () = printf "iterating over children in fam_link %s, (get_key_index p)=%d\n%!"
+                                                        (string_of_famlink fam_link) (Adef.int_of_iper (get_key_index p))
+                                        in
                                         let (ifath, imoth, ifam) =
                                           (Adef.iper_of_int (Int32.to_int fam_link.MLink.Family.ifath),
                                            Adef.iper_of_int (Int32.to_int fam_link.MLink.Family.imoth),
@@ -3312,22 +3314,22 @@ let build_graph_desc_full' conf base p max_gen =
                                         in
                                         let cpl =
                                           let ip = get_key_index p in
-                                          if ip <> ifath && ip <> imoth then
-                                          match
-                                            Perso_link.get_person_link_with_base
+                                          if ip <> ifath && ip <> imoth (* comparing is weird because indexes are from another db*)
+                                          then
+                                            match Perso_link.get_person_link_with_base
                                               conf.command ip fam_link.MLink.Family.baseprefix
-                                          with
-                                          | Some p ->
+                                            with
+                                            | Some p ->
                                               let ip = Adef.iper_of_int (Int32.to_int p.MLink.Person.ip) in
-                                              (* let () = add_alias (conf.command, ip) (fam_link.MLink.Family.baseprefix ip) in *)
+                                              (* let () = add_alias (conf.command, ip, factor) ~alias(fam_link.MLink.Family.baseprefix ip) in *)
                                               (ifath, imoth, if ip = ifath then imoth else ifath)
-                                          | None -> (ifath, imoth, if ip = ifath then imoth else ifath)
+                                            | None -> (ifath, imoth, if ip = ifath then imoth else ifath)
                                           else (ifath, imoth, if ip = ifath then imoth else ifath)
                                         in
                                         let () = printfn "iterating over family link" in
                                         let (_, _, isp) = cpl in
                                         (* isp is from another databse *)
-                                        (* let () = printfn "isp = %s" (string_of_iper isp) in *)
+                                        let () = printfn "isp = %d" (Adef.int_of_iper isp) in
                                         let sp_factor =
                                           try
                                             let i = Hashtbl.find ht (fam_link.MLink.Family.baseprefix, isp) + 1 in
