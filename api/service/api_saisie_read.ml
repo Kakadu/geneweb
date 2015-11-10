@@ -3110,6 +3110,7 @@ module IntPairMap =
                 else r
             end)
 
+type temp_node_info = string * int (* base, index *)
 (* Graphe de descendance (api.proto) *)
 
 let build_graph_desc_full' conf base p max_gen =
@@ -3121,10 +3122,9 @@ let build_graph_desc_full' conf base p max_gen =
   let () = load_couples_array base in
   let () = Perso.build_sosa_ht conf base in
 *)
-  let ht = Hashtbl.create 42 in
   let myhash (prefix,index,factor) =
     let ans = Hashtbl.hash (prefix,index, factor) in
-    (* printfn "  myhash ('%s',%d,%d) = %d" prefix (Adef.int_of_iper index) factor ans; *)
+    printfn "  myhash ('%s',%d,%d) = %d" prefix (Adef.int_of_iper index) factor ans;
     ans
   in
 
@@ -3134,8 +3134,18 @@ let build_graph_desc_full' conf base p max_gen =
     | None -> ()
   in
 
+  let person_aliases: (temp_node_info,temp_node_info) Hashtbl.t = Hashtbl.create 43 in
+  let add_alias info ~alias = Hashtbl.add person_aliases alias info in
+  let get_real_info info =
+    try Hashtbl.find person_aliases info
+    with Not_found -> info
+  in
+
+  let _ = add_alias in
+  let _ = get_real_info in
+
   let edges_mem: Mread.Edge.t IntPairMap.t ref = ref IntPairMap.empty in
-  let create_edge factor_from baseprefix_from p_from factor_to baseprefix_to p_to =
+  let create_edge (baseprefix_from, p_from, factor_from) (baseprefix_to, p_to, factor_to) =
     (* Pour les liens inter arbres, on rend l'id unique avec *)
     (* le prefix de la base et l'index de la personne.       *)
     let id_from =
@@ -3206,6 +3216,12 @@ let build_graph_desc_full' conf base p max_gen =
     sprintf " %s & %s'" (string_of_iper (Adef.father cpl)) (string_of_iper (Adef.mother cpl))
   in
 
+  let string_of_famlink l =
+    sprintf "{ ifath=%ld; imoth=%ld; ifam=%ld }" l.MLink.Family.ifath l.MLink.Family.imoth l.MLink.Family.ifam
+  in
+
+  let ht: (Adef.iper, int) Hashtbl.t = Hashtbl.create 42 in
+
   let nodes = ref [] in
   let edges = ref [] in
   let families = ref [] in
@@ -3238,7 +3254,7 @@ let build_graph_desc_full' conf base p max_gen =
                     List.map (poi base) (Array.to_list (get_children fam))
                   in
                   maybe_append nodes (create_node sp ifam gen Spouse conf.command sp_factor);
-                  maybe_append edges (create_edge factor conf.command p sp_factor conf.command sp);
+                  maybe_append edges (create_edge (conf.command,p,factor) (conf.command,sp,sp_factor) );
                   if gen <> max_gen then
                     begin
                       List.iter
@@ -3253,8 +3269,8 @@ let build_graph_desc_full' conf base p max_gen =
                             with Not_found -> Hashtbl.add ht (get_key_index c) 1; 1
                           in
                           maybe_append nodes (create_node c ifam gen Children conf.command c_factor);
-                          maybe_append edges (create_edge factor conf.command p c_factor conf.command c);
-                          maybe_append edges (create_edge sp_factor conf.command sp c_factor conf.command c) )
+                          maybe_append edges (create_edge (conf.command, p,factor)    (conf.command,c,c_factor) );
+                          maybe_append edges (create_edge (conf.command,sp,sp_factor) (conf.command,c,sp_factor)) )
                         children;
                       create_family ifam families;
                       let child_local =
@@ -3278,6 +3294,7 @@ let build_graph_desc_full' conf base p max_gen =
                               if gen >= max_gen then loop_child l
                               else
                                 begin
+                                  let () = printfn "loop_child over fam_links: ('%s',%d,_)" base_prefix (Adef.int_of_iper (get_key_index p)) in
                                   let factor =
                                     try Hashtbl.find ht (base_prefix, get_key_index p) with Not_found -> 1
                                   in
@@ -3287,7 +3304,7 @@ let build_graph_desc_full' conf base p max_gen =
                                   let children_link =
                                     ListLabels.fold_left ~init:l family_link
                                       ~f:(fun accu fam_link ->
-                                        let () = printf "iterating over children in link\n%!" in
+                                        let () = printf "iterating over children in fam_link %s\n%!" (string_of_famlink fam_link) in
                                         let (ifath, imoth, ifam) =
                                           (Adef.iper_of_int (Int32.to_int fam_link.MLink.Family.ifath),
                                            Adef.iper_of_int (Int32.to_int fam_link.MLink.Family.imoth),
@@ -3302,13 +3319,15 @@ let build_graph_desc_full' conf base p max_gen =
                                           with
                                           | Some p ->
                                               let ip = Adef.iper_of_int (Int32.to_int p.MLink.Person.ip) in
+                                              (* let () = add_alias (conf.command, ip) (fam_link.MLink.Family.baseprefix ip) in *)
                                               (ifath, imoth, if ip = ifath then imoth else ifath)
                                           | None -> (ifath, imoth, if ip = ifath then imoth else ifath)
                                           else (ifath, imoth, if ip = ifath then imoth else ifath)
                                         in
-                                        let () = printf "iterating over family link\n%!" in
-
+                                        let () = printfn "iterating over family link" in
                                         let (_, _, isp) = cpl in
+                                        (* isp is from another databse *)
+                                        (* let () = printfn "isp = %s" (string_of_iper isp) in *)
                                         let sp_factor =
                                           try
                                             let i = Hashtbl.find ht (fam_link.MLink.Family.baseprefix, isp) + 1 in
@@ -3321,6 +3340,7 @@ let build_graph_desc_full' conf base p max_gen =
                                           (fun accu c_link ->
                                             printfn "iter fam_link child";
                                             let baseprefix = c_link.MLink.Person_link.baseprefix in
+                                            let () = printfn "baseprefix = %s, base_prefix=%s" baseprefix base_prefix in
                                             let ip_c =
                                               Adef.iper_of_int (Int32.to_int c_link.MLink.Person_link.ip)
                                             in
@@ -3347,8 +3367,8 @@ let build_graph_desc_full' conf base p max_gen =
                                                     with Not_found -> Hashtbl.add ht (baseprefix, get_key_index c) 1; 1
                                                   in
                                                   maybe_append nodes (create_node c ifam gen Children baseprefix c_factor);
-                                                  maybe_append edges (create_edge factor base_prefix p c_factor baseprefix c);
-                                                  maybe_append edges (create_edge sp_factor baseprefix sp c_factor baseprefix c);
+                                                  maybe_append edges (create_edge (base_prefix,p,factor)    (baseprefix,c,c_factor) );
+                                                  maybe_append edges (create_edge (baseprefix,sp,sp_factor) (baseprefix,c,c_factor) );
                                                   (baseprefix, c, gen + 1) :: accu
                                             | None -> accu)
                                           accu fam_link.MLink.Family.children)
@@ -3356,6 +3376,7 @@ let build_graph_desc_full' conf base p max_gen =
                                   loop_child children_link;
                                 end
                         in
+                        printfn "start loop_child from bname='%s' p='%s'" conf.bname (string_of_person p);
                         loop_child [(conf.bname, p, gen)]
                       in
                       child_local
@@ -3424,7 +3445,7 @@ let build_graph_desc_full' conf base p max_gen =
                                      in
                                      printfn "Linked spouse is %s" (string_of_person sp);
                                      maybe_append nodes (create_node sp ifam gen Spouse baseprefix sp_factor);
-                                     maybe_append edges (create_edge factor base_prefix p sp_factor baseprefix sp);
+                                     maybe_append edges (create_edge (base_prefix,p,factor) (baseprefix,sp,sp_factor) );
                                      if gen <> max_gen then
                                        begin
                                          let family_link =
@@ -3466,8 +3487,8 @@ let build_graph_desc_full' conf base p max_gen =
                                                          with Not_found -> Hashtbl.add ht (baseprefix, get_key_index c) 1; 1
                                                        in
                                                        maybe_append nodes (create_node c ifam gen Children baseprefix c_factor);
-                                                       maybe_append edges (create_edge factor base_prefix p c_factor baseprefix c);
-                                                       maybe_append edges (create_edge sp_factor baseprefix sp c_factor baseprefix c);
+                                                       maybe_append edges (create_edge (base_prefix, p,factor)    (baseprefix,c,c_factor) );
+                                                       maybe_append edges (create_edge (baseprefix, sp,sp_factor) (baseprefix,c,c_factor) );
                                                        (baseprefix, c, gen + 1) :: accu
                                                    | None -> accu)
                                                  accu fam_link.MLink.Family.children)
