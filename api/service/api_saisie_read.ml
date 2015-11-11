@@ -3110,7 +3110,7 @@ module IntPairMap =
                 else r
             end)
 
-type temp_node_info = string * int (* base, index *)
+type temp_node_info = string * Adef.iper * int (* (base, index, factor) *)
 (* Graphe de descendance (api.proto) *)
 
 let build_graph_desc_full' conf base p max_gen =
@@ -3148,12 +3148,13 @@ let build_graph_desc_full' conf base p max_gen =
   let create_edge (baseprefix_from, p_from, factor_from) (baseprefix_to, p_to, factor_to) =
     (* Pour les liens inter arbres, on rend l'id unique avec *)
     (* le prefix de la base et l'index de la personne.       *)
-    let id_from =
-      Int64.of_int (myhash (baseprefix_from, get_key_index p_from, factor_from))
-    in
-    let id_to =
-      Int64.of_int (myhash (baseprefix_to, get_key_index p_to, factor_to))
-    in
+    let info_from = (baseprefix_from, get_key_index p_from, factor_from) in
+    let info_from = get_real_info info_from in
+    let id_from =  Int64.of_int (myhash info_from) in
+
+    let info_to = (baseprefix_to, get_key_index p_to, factor_to) in
+    let info_to = get_real_info info_to in
+    let id_to = Int64.of_int (myhash info_to) in
 
     try let _ = IntPairMap.find (id_from,id_to) !edges_mem in
         (* already added *)
@@ -3217,7 +3218,7 @@ let build_graph_desc_full' conf base p max_gen =
   in
 
   let string_of_famlink l =
-    sprintf "{ ifath=%ld; imoth=%ld; ifam=%ld }" l.MLink.Family.ifath l.MLink.Family.imoth l.MLink.Family.ifam
+    sprintf "{ ifath=%ld; imoth=%ld; ifam=%ld; baseprefix='%s' }" l.MLink.Family.ifath l.MLink.Family.imoth l.MLink.Family.ifam l.MLink.Family.baseprefix
   in
 
   let ht: (Adef.iper, int) Hashtbl.t = Hashtbl.create 42 in
@@ -3312,31 +3313,41 @@ let build_graph_desc_full' conf base p max_gen =
                                            Adef.iper_of_int (Int32.to_int fam_link.MLink.Family.imoth),
                                            Adef.ifam_of_int (Int32.to_int fam_link.MLink.Family.ifam))
                                         in
+                                        let distant_base = fam_link.MLink.Family.baseprefix in
                                         let cpl =
                                           let ip = get_key_index p in
-                                          if ip <> ifath && ip <> imoth (* comparing is weird because indexes are from another db*)
-                                          then
+                                          if distant_base = base_prefix then begin
+                                            (* link inside the same database. Not really well tested yet *)
+                                            (ifath, imoth, if ip = ifath then imoth else ifath)
+                                          end else begin
                                             match Perso_link.get_person_link_with_base
-                                              conf.command ip fam_link.MLink.Family.baseprefix
+                                              conf.command ip distant_base
                                             with
-                                            | Some p ->
-                                              let ip = Adef.iper_of_int (Int32.to_int p.MLink.Person.ip) in
-                                              (* let () = add_alias (conf.command, ip, factor) ~alias(fam_link.MLink.Family.baseprefix ip) in *)
-                                              (ifath, imoth, if ip = ifath then imoth else ifath)
+                                            | Some p -> begin
+                                                let dist_ip = Adef.iper_of_int (Int32.to_int p.MLink.Person.ip) in
+                                                (* TODO: check this peice of code again *)
+                                                try let fc = Hashtbl.find ht (fam_link.MLink.Family.baseprefix, ip) in
+                                                    let () = add_alias (conf.command, ip, factor) ~alias:(fam_link.MLink.Family.baseprefix,dist_ip,fc) in
+                                                    (ifath, imoth, if dist_ip = ifath then imoth else ifath)
+                                                with Not_found ->
+                                                     let () = Hashtbl.add ht (fam_link.MLink.Family.baseprefix, ip) 1 in
+                                                     let () = add_alias (conf.command, ip, factor) ~alias:(fam_link.MLink.Family.baseprefix,dist_ip,1) in
+                                                     (ifath, imoth, if dist_ip = ifath then imoth else ifath)
+                                              end
                                             | None -> (ifath, imoth, if ip = ifath then imoth else ifath)
-                                          else (ifath, imoth, if ip = ifath then imoth else ifath)
+                                          end
                                         in
                                         let () = printfn "iterating over family link" in
                                         let (_, _, isp) = cpl in
                                         (* isp is from another databse *)
                                         let () = printfn "isp = %d" (Adef.int_of_iper isp) in
-                                        let sp_factor =
-                                          try
-                                            let i = Hashtbl.find ht (fam_link.MLink.Family.baseprefix, isp) + 1 in
-                                            Hashtbl.replace ht (fam_link.MLink.Family.baseprefix, isp) i;
-                                            i
-                                          with Not_found -> Hashtbl.add ht (fam_link.MLink.Family.baseprefix, isp) 1; 1
-                                        in
+                                        (* let sp_factor = *)
+                                        (*   try *)
+                                        (*     let i = Hashtbl.find ht (fam_link.MLink.Family.baseprefix, isp) + 1 in *)
+                                        (*     Hashtbl.replace ht (fam_link.MLink.Family.baseprefix, isp) i; *)
+                                        (*     i *)
+                                        (*   with Not_found -> Hashtbl.add ht (fam_link.MLink.Family.baseprefix, isp) 1; 1 *)
+                                        (* in *)
                                         create_family_link (ifath, imoth) ifam fam families;
                                         List.fold_left
                                           (fun accu c_link ->
@@ -3356,6 +3367,7 @@ let build_graph_desc_full' conf base p max_gen =
                                                 else
                                                   let () = print_endline "adding new child to the list" in
                                                   let (c, _) = Perso_link.make_ep_link conf base c_link in
+
                                                   let () =
                                                     let p = gen_person_of_person c in
                                                     printfn " '%s %s'" (sou base p.first_name)  (sou base p.surname);
@@ -3368,9 +3380,10 @@ let build_graph_desc_full' conf base p max_gen =
                                                       i
                                                     with Not_found -> Hashtbl.add ht (baseprefix, get_key_index c) 1; 1
                                                   in
+
                                                   maybe_append nodes (create_node c ifam gen Children baseprefix c_factor);
                                                   maybe_append edges (create_edge (base_prefix,p,factor)    (baseprefix,c,c_factor) );
-                                                  maybe_append edges (create_edge (baseprefix,sp,sp_factor) (baseprefix,c,c_factor) );
+                                                  (* maybe_append edges (create_edge (baseprefix,sp,sp_factor) (baseprefix,c,c_factor) );  *)
                                                   (baseprefix, c, gen + 1) :: accu
                                             | None -> accu)
                                           accu fam_link.MLink.Family.children)
