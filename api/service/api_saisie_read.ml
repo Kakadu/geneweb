@@ -3116,15 +3116,19 @@ type temp_node_info = string * Adef.iper * int (* (base, index, factor) *)
 let build_graph_desc_full' conf base p max_gen =
   printfn "build_graph_desc_full";
 
+  let starting_bname = conf.bname in
 (*
   let () = load_descends_array base in
   let () = load_unions_array base in
   let () = load_couples_array base in
   let () = Perso.build_sosa_ht conf base in
 *)
-  let myhash (prefix,index,factor) =
+  let string_of_nodeinfo (prefix,index,factor) =
+    sprintf "('%s',%d,%d)" prefix (Adef.int_of_iper index) factor
+  in
+  let myhash ((prefix,index,factor) as ni) =
     let ans = Hashtbl.hash (prefix,index, factor) in
-    printfn "  myhash ('%s',%d,%d) = %d" prefix (Adef.int_of_iper index) factor ans;
+    printfn "  myhash %s = %d" (string_of_nodeinfo ni) ans;
     ans
   in
 
@@ -3135,7 +3139,10 @@ let build_graph_desc_full' conf base p max_gen =
   in
 
   let person_aliases: (temp_node_info,temp_node_info) Hashtbl.t = Hashtbl.create 43 in
-  let add_alias info ~alias = Hashtbl.add person_aliases alias info in
+  let add_alias info ~alias =
+    printfn "Adding alias %s <===> %s" (string_of_nodeinfo info) (string_of_nodeinfo alias);
+    Hashtbl.add person_aliases alias info
+  in
   let get_real_info info =
     try Hashtbl.find person_aliases info
     with Not_found -> info
@@ -3254,8 +3261,8 @@ let build_graph_desc_full' conf base p max_gen =
                   let children =
                     List.map (poi base) (Array.to_list (get_children fam))
                   in
-                  maybe_append nodes (create_node sp ifam gen Spouse conf.command sp_factor);
-                  maybe_append edges (create_edge (conf.command,p,factor) (conf.command,sp,sp_factor) );
+                  maybe_append nodes (create_node sp ifam gen Spouse starting_bname sp_factor);
+                  maybe_append edges (create_edge (starting_bname,p,factor) (starting_bname,sp,sp_factor) );
                   if gen <> max_gen then
                     begin
                       List.iter
@@ -3269,9 +3276,9 @@ let build_graph_desc_full' conf base p max_gen =
                               i
                             with Not_found -> Hashtbl.add ht (get_key_index c) 1; 1
                           in
-                          maybe_append nodes (create_node c ifam gen Children conf.command c_factor);
-                          maybe_append edges (create_edge (conf.command, p,factor)    (conf.command,c,c_factor) );
-                          maybe_append edges (create_edge (conf.command,sp,sp_factor) (conf.command,c,sp_factor)) )
+                          maybe_append nodes (create_node c ifam gen Children starting_bname c_factor);
+                          maybe_append edges (create_edge (starting_bname, p,factor)    (starting_bname,c,c_factor) );
+                          maybe_append edges (create_edge (starting_bname,sp,sp_factor) (starting_bname,c,sp_factor)) )
                         children;
                       create_family ifam families;
                       let child_local =
@@ -3327,11 +3334,11 @@ let build_graph_desc_full' conf base p max_gen =
                                                 let dist_ip = Adef.iper_of_int (Int32.to_int p.MLink.Person.ip) in
                                                 (* TODO: check this peice of code again *)
                                                 try let fc = Hashtbl.find ht (fam_link.MLink.Family.baseprefix, ip) in
-                                                    let () = add_alias (conf.command, ip, factor) ~alias:(fam_link.MLink.Family.baseprefix,dist_ip,fc) in
+                                                    let () = add_alias (starting_bname, ip, factor) ~alias:(fam_link.MLink.Family.baseprefix,dist_ip,fc) in
                                                     (ifath, imoth, if dist_ip = ifath then imoth else ifath)
                                                 with Not_found ->
                                                      let () = Hashtbl.add ht (fam_link.MLink.Family.baseprefix, ip) 1 in
-                                                     let () = add_alias (conf.command, ip, factor) ~alias:(fam_link.MLink.Family.baseprefix,dist_ip,1) in
+                                                     let () = add_alias (starting_bname, ip, factor) ~alias:(fam_link.MLink.Family.baseprefix,dist_ip,1) in
                                                      (ifath, imoth, if dist_ip = ifath then imoth else ifath)
                                               end
                                             | None -> (ifath, imoth, if ip = ifath then imoth else ifath)
@@ -3523,7 +3530,8 @@ let build_graph_desc_full' conf base p max_gen =
             loop l
           end
   in
-  maybe_append nodes (create_node p (Adef.ifam_of_int (-1)) 1 Root conf.command 1);
+
+  maybe_append nodes (create_node p (Adef.ifam_of_int (-1)) 1 Root starting_bname 1);
   loop [(p, 1)];
   (* On retourne la liste pour avoir les noeuds dans l'ordre *)
   (* la référence, suivi du père suivi, puis de la mère ...  *)
