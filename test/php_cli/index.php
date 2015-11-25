@@ -8,7 +8,7 @@
 require_once('GenewebAPI.cls.php');
 require_once('filters/Filter.cls.php');
 
-const URL_API = "http://vm-swan:2322/";
+const URL_API = "http://localhost:2322/";
 
 class Request {
 
@@ -74,10 +74,12 @@ class APIController {
 			//$meta = meta::from_sourcename($req->gp('base'));
 			switch($req->gp('type')){
 			case 'friend':
-				$api->enableModeFriend($req->gp('base'));
+				//$api->enableModeFriend($req->gp('base'));
+				$api->enableModeFriend('friend');
 				break;
 			case 'wizard':
-				$api->enableModeWizard($req->gp('base'));
+				$api->enableModeWizard('wizard');
+//				$api->enableModeWizard($req->gp('base'));
 				break;
 			}
 
@@ -390,4 +392,3 @@ echo $controller->render();
 
 </body>
 </html>
-
