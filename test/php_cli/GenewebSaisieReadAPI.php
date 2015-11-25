@@ -88,7 +88,7 @@ class GenewebSaisieReadAPI
      * @return void
      *
      */
-    public function enableModeWizard($user, $password)
+    public function enableModeWizard($user, $password = '123')
     {
         $this->user = $user;
         $this->password = $password;
@@ -104,7 +104,7 @@ class GenewebSaisieReadAPI
      * @return void
      *
      */
-    public function enableModeFriend($user, $password)
+    public function enableModeFriend($user, $password = '123')
     {
         $this->enableModeWizard($user, $password);
         $this->modeWizard = false;
