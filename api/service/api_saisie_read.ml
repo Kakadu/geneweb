@@ -2517,7 +2517,7 @@ let build_graph_asc_main pers_to_piqi make_node_helper conf base p max_gen =
   let () = Perso.build_sosa_ht conf base in
 *)
   let starting_bname = conf.bname in
-  let (_:string) = starting_bname in
+
   let ht = Hashtbl.create 42 in
   let create_edge factor_from baseprefix_from p_from factor_to baseprefix_to p_to =
     (* Pour les liens inter arbres, on rend l'id unique avec *)
@@ -2585,10 +2585,10 @@ let build_graph_asc_main pers_to_piqi make_node_helper conf base p max_gen =
                     i
                   with Not_found -> Hashtbl.add ht (get_key_index moth) 1; 1
                 in
-                nodes := create_node fath gen Ancestor conf.command fath_factor :: !nodes;
-                nodes := create_node moth gen Ancestor conf.command moth_factor :: !nodes;
-                edges := create_edge factor conf.command p fath_factor conf.command fath :: !edges;
-                edges := create_edge factor conf.command p moth_factor conf.command moth :: !edges;
+                nodes := create_node fath gen Ancestor starting_bname fath_factor :: !nodes;
+                nodes := create_node moth gen Ancestor starting_bname moth_factor :: !nodes;
+                edges := create_edge factor starting_bname p fath_factor starting_bname fath :: !edges;
+                edges := create_edge factor starting_bname p moth_factor starting_bname moth :: !edges;
                 create_family ifam families;
                 loop ((fath, gen + 1) :: (moth, gen + 1) :: l)
             | None ->
@@ -2651,12 +2651,12 @@ let build_graph_asc_main pers_to_piqi make_node_helper conf base p max_gen =
                               end
                           | None -> loop_parents l
                   in
-                  loop_parents [(conf.bname, p, gen)]
+                  loop_parents [(starting_bname, p, gen)]
                 in
                 loop l
           end
   in
-  nodes := create_node p 1 Root conf.command 1 :: !nodes;
+  nodes := create_node p 1 Root starting_bname 1 :: !nodes;
   loop [(p, 1)];
   (* On retourne la liste pour avoir les noeuds dans l'ordre *)
   (* la référence, suivi du père suivi, puis de la mère ...  *)
