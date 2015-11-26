@@ -1645,6 +1645,561 @@ let build_graph_asc conf base p max_gen base_loop : (Mread.Node.t list * Mread.E
   loop [(p, 1)] nodes edges families
 ;;
 
+(* ********************************************************************* *)
+(*  [Fonc] fam_to_piqi_family_tree :
+             config -> base -> ifam -> Full_family                       *)
+(** [Description] :
+    [Args] :
+      - conf  : configuration de la base
+      - base  : base de donnée
+      - ifam  : ifam
+    [Retour] :
+      -
+    [Rem] : Non exporté en clair hors de ce module.                      *)
+(* ********************************************************************* *)
+let fam_to_piqi_family_tree conf base ifam =
+  let fam = foi base ifam in
+  let gen_f = Util.string_gen_family base (gen_family_of_family fam) in
+  let ifath = get_father fam in
+  let imoth = get_mother fam in
+  let m_auth =
+    authorized_age conf base (pget conf base ifath) &&
+    authorized_age conf base (pget conf base imoth)
+  in
+  let index = Int32.of_int (Adef.int_of_ifam ifam) in
+  let fsources =
+    if m_auth then Some gen_f.fsources
+    else None
+  in
+  let marriage =
+    match Adef.od_of_codate gen_f.marriage with
+    | Some d when m_auth -> Some (string_of_date conf d)
+    | _ -> None
+  in
+  let marriage_place =
+    if m_auth then Some gen_f.marriage_place
+    else None
+  in
+  let marriage_src =
+    if m_auth then Some gen_f.marriage_src
+    else None
+  in
+  let marriage_type =
+    match gen_f.relation with
+    | Married -> `married
+    | NotMarried -> `not_married
+    | Engaged -> `engaged
+    | NoSexesCheckNotMarried -> `no_sexes_check_not_married
+    | NoMention -> `no_mention
+    | NoSexesCheckMarried -> `no_sexes_check_married
+  in
+  let (divorce_type, divorce_date) =
+    match gen_f.divorce with
+    | NotDivorced -> (`not_divorced, None)
+    | Divorced cod ->
+        (match Adef.od_of_codate cod with
+         | Some d when m_auth -> (`divorced, Some (string_of_date conf d))
+         | _ -> (`divorced, None))
+    | Separated -> (`separated, None)
+  in
+  Mread.Family_tree_full.({
+    fsources = fsources;
+    marriage_date = marriage;
+    marriage_place = marriage_place;
+    marriage_src = marriage_src;
+    marriage_type = marriage_type;
+    divorce_type = divorce_type;
+    divorce_date = divorce_date;
+    index = index;
+  })
+;;
+
+
+(* *********************************************************************** *)
+(*  [Fonc] fam_to_piqi_family_tree_link :
+             config -> base -> ifam -> Full_family                         *)
+(** [Description] :
+    [Args] :
+      - conf  : configuration de la base
+      - base  : base de donnée
+      - ifam  : ifam
+    [Retour] :
+      -
+    [Rem] : Non exporté en clair hors de ce module.                        *)
+(* *********************************************************************** *)
+let fam_to_piqi_family_tree_link conf base (ifath, imoth) ifam fam =
+  let gen_f = Util.string_gen_family base (gen_family_of_family fam) in
+  let index = Int32.of_int (Adef.int_of_ifam ifam) in
+  let fsources = None in
+  let marriage =
+    match Adef.od_of_codate gen_f.marriage with
+    | Some d -> Some (string_of_date conf d)
+    | _ -> None
+  in
+  let marriage_place = Some gen_f.marriage_place in
+  let marriage_src = Some gen_f.marriage_src in
+  let marriage_type =
+    match gen_f.relation with
+    | Married -> `married
+    | NotMarried -> `not_married
+    | Engaged -> `engaged
+    | NoSexesCheckNotMarried -> `no_sexes_check_not_married
+    | NoMention -> `no_mention
+    | NoSexesCheckMarried -> `no_sexes_check_married
+  in
+  let (divorce_type, divorce_date) =
+    match gen_f.divorce with
+    | NotDivorced -> (`not_divorced, None)
+    | Divorced cod ->
+        (match Adef.od_of_codate cod with
+         | Some d -> (`divorced, Some (string_of_date conf d))
+         | _ -> (`divorced, None))
+    | Separated -> (`separated, None)
+  in
+  Mread.Family_tree_full.({
+    fsources = fsources;
+    marriage_date = marriage;
+    marriage_place = marriage_place;
+    marriage_src = marriage_src;
+    marriage_type = marriage_type;
+    divorce_type = divorce_type;
+    divorce_date = divorce_date;
+    index = index;
+  })
+;;
+
+
+module IntPairMap =
+  Map.Make(struct
+              type t = int64*int64
+              let compare: t -> t -> int = fun (x1,y1) (x2,y2) ->
+                let r = compare x1 x2 in
+                if r = 0 then compare y1 y2
+                else r
+            end)
+
+type temp_node_info = string * Adef.iper * int (* (base, index, factor) *)
+let string_of_nodeinfo (prefix,index,factor) =
+  sprintf "('%s',%d,%d)" prefix (Adef.int_of_iper index) factor
+
+
+
+
+(* Graphe de descendance (api.proto) *)
+let build_graph_desc_main pers_to_piqi make_node_helper conf base p max_gen =
+  printfn "build_graph_desc_full";
+
+  let starting_bname = conf.bname in
+
+  let myhash node_info =
+    let ans = Hashtbl.hash node_info in
+    (* printfn "  myhash %s = %d" (string_of_nodeinfo ni) ans; *)
+    ans
+  in
+
+  let maybe_append refs x =
+    match x with
+    | Some v -> refs := v :: !refs
+    | None -> ()
+  in
+
+  let person_aliases: (temp_node_info,temp_node_info) Hashtbl.t = Hashtbl.create 43 in
+  let add_alias info ~alias =
+    (* printfn "Adding alias %s <===> %s" (string_of_nodeinfo info) (string_of_nodeinfo alias); *)
+    Hashtbl.add person_aliases alias info
+  in
+  let get_real_info info =
+    try Hashtbl.find person_aliases info
+    with Not_found -> info
+  in
+
+  let edges_mem: Mread.Edge.t IntPairMap.t ref = ref IntPairMap.empty in
+  let create_edge (baseprefix_from, p_from, factor_from) (baseprefix_to, p_to, factor_to) =
+    (* Pour les liens inter arbres, on rend l'id unique avec *)
+    (* le prefix de la base et l'index de la personne.       *)
+    let info_from = (baseprefix_from, get_key_index p_from, factor_from) in
+    let info_from = get_real_info info_from in
+    let id_from =  Int64.of_int (myhash info_from) in
+
+    let info_to = (baseprefix_to, get_key_index p_to, factor_to) in
+    let info_to = get_real_info info_to in
+    let id_to = Int64.of_int (myhash info_to) in
+
+    try let _ = IntPairMap.find (id_from,id_to) !edges_mem in
+        (* already added *)
+        None
+    with Not_found ->
+      (* let () = printfn "create edge %s -> %s" (Int64.to_string id_from) (Int64.to_string id_to) in *)
+      let e = Mread.Edge.({ from_node = id_from; to_node = id_to; }) in
+      (* let () = printf "********* adding (%Ld,%Ld) to edges_mem map\n" id_from id_to in *)
+      let () = edges_mem := IntPairMap.add (id_from,id_to) e !edges_mem in
+      Some e
+  in
+
+  let nodes_mem: (int, _) Hashtbl.t = Hashtbl.create 97 in
+  let create_node p ifam gen more_info base_prefix factor =
+    (* Pour les liens inter arbres, on rend l'id unique avec *)
+    (* le prefix de la base et l'index de la personne.       *)
+    let uniq_id = myhash (base_prefix, get_key_index p, factor) in
+    try let _ = Hashtbl.find nodes_mem uniq_id in
+        None
+    with Not_found ->
+      (* let () = printfn "create_node '%s' unique_id=%d" (string_of_graph_more_info more_info) uniq_id in *)
+      let id = Int64.of_int uniq_id in
+      let p = pers_to_piqi conf base p more_info gen max_gen base_prefix in
+      let ifam = Int64.of_int (Adef.int_of_ifam ifam) in
+      let ans = make_node_helper id p (Some ifam) in
+      (* let ans = Mread.Node_full.({ *)
+      (*   id = id; *)
+      (*   person = p; *)
+      (*   ifam = Some ifam; *)
+      (* }) *)
+      (* in *)
+      let () = Hashtbl.add nodes_mem uniq_id ans in
+      Some ans
+  in
+  let create_family ifam families =
+    if p_getenv conf.env "full_infos" = Some "1" then
+      families := (fam_to_piqi_family_tree conf base ifam) :: !families
+  in
+  let create_family_link (ifath, imoth) ifam fam families =
+    if p_getenv conf.env "full_infos" = Some "1" then
+      families :=
+        (fam_to_piqi_family_tree_link conf base (ifath, imoth) ifam fam) :: !families
+  in
+(*
+  let print_person p =
+    let gp = gen_person_of_person p in
+    printfn " '%s %s'" (sou base gp.first_name)  (sou base gp.surname)
+  in
+
+  let string_of_person p =
+    let gp = gen_person_of_person p in
+    sprintf "%s %s" (sou base gp.first_name)  (sou base gp.surname)
+  in
+  let string_of_iper ip =
+    let p = poi base ip in
+    let gp = gen_person_of_person p in
+    sprintf "%d %s %s" (Adef.int_of_iper ip) (sou base gp.first_name)  (sou base gp.surname)
+  in
+  let string_of_fam f =
+    let cpl = gen_couple_of_couple f in
+    sprintf " %s & %s'" (string_of_iper (Adef.father cpl)) (string_of_iper (Adef.mother cpl))
+  in
+
+  let string_of_famlink l =
+    sprintf "{ ifath=%ld; imoth=%ld; ifam=%ld; baseprefix='%s' }" l.MLink.Family.ifath l.MLink.Family.imoth l.MLink.Family.ifam l.MLink.Family.baseprefix
+  in
+ *)
+  let ht: (Adef.iper, int) Hashtbl.t = Hashtbl.create 42 in
+
+  let nodes = ref [] in
+  let edges = ref [] in
+  let families = ref [] in
+  let rec loop l =
+    match l with
+    | [] -> ()
+    | (p, gen) :: l ->
+        if gen >= max_gen then loop l
+        else
+          begin
+            (* let () = printfn "top-level loop" in *)
+            let factor =
+              try Hashtbl.find ht (get_key_index p) with Not_found -> 1
+            in
+            let ifam = get_family p in
+            let l =
+              ListLabels.fold_left ~init:l (Array.to_list ifam)
+                ~f:(fun accu ifam ->
+                  (* let () = printfn "\t iterating over family %d" (Adef.int_of_ifam ifam) in *)
+                  let fam = foi base ifam in
+                  let sp = poi base (Gutil.spouse (get_key_index p) fam) in
+                  let sp_factor =
+                    try
+                      let i = Hashtbl.find ht (get_key_index sp) + 1 in
+                      Hashtbl.replace ht (get_key_index sp) i;
+                      i
+                    with Not_found -> Hashtbl.add ht (get_key_index sp) 1; 1
+                  in
+                  let children =
+                    List.map (poi base) (Array.to_list (get_children fam))
+                  in
+                  maybe_append nodes (create_node sp ifam gen Spouse starting_bname sp_factor);
+                  maybe_append edges (create_edge (starting_bname,p,factor) (starting_bname,sp,sp_factor) );
+                  if gen <> max_gen then
+                    begin
+                      List.iter
+                        (fun c ->
+                          (* printfn "\t\t iterating over child in the family %d" (Adef.int_of_ifam ifam); *)
+                          (* let () = print_person c in *)
+                          let c_factor : int =
+                            try
+                              let i = Hashtbl.find ht (get_key_index c) + 1 in
+                              Hashtbl.replace ht (get_key_index c) i;
+                              i
+                            with Not_found -> Hashtbl.add ht (get_key_index c) 1; 1
+                          in
+                          maybe_append nodes (create_node c ifam gen Children starting_bname c_factor);
+                          maybe_append edges (create_edge (starting_bname, p,factor)    (starting_bname,c,c_factor) );
+                          maybe_append edges (create_edge (starting_bname,sp,sp_factor) (starting_bname,c,sp_factor)) )
+                        children;
+                      create_family ifam families;
+                      let child_local =
+                        List.fold_left
+                          (fun accu c -> (c, gen + 1) :: accu)
+                          accu children
+                      in
+
+
+                      (* printfn "\t\t Now trying to iterate over children linked with current family"; *)
+                      (* lien inter arbre *)
+                      let () =
+                        Perso_link.init_cache conf base (get_key_index p) 1 1 (max_gen - gen)
+                      in
+                      let () =
+                        let ht = Hashtbl.create 42 in
+                        let rec loop_child fam_link =
+                          match fam_link with
+                          | [] -> ()
+                          | (base_prefix, p, gen) :: l ->
+                              if gen >= max_gen then loop_child l
+                              else
+                                begin
+                                  (* let () = printfn "loop_child over fam_links: ('%s',%d,_)" base_prefix (Adef.int_of_iper (get_key_index p)) in *)
+                                  let factor =
+                                    try Hashtbl.find ht (base_prefix, get_key_index p) with Not_found -> 1
+                                  in
+                                  let family_link =
+                                    Perso_link.get_family_link base_prefix (get_key_index p)
+                                  in
+                                  let children_link =
+                                    ListLabels.fold_left ~init:l family_link
+                                    ~f:(fun accu fam_link ->
+                                        (* let () = printf "iterating over children in fam_link %s, (get_key_index p)=%d\n%!" *)
+                                        (*                 (string_of_famlink fam_link) (Adef.int_of_iper (get_key_index p)) *)
+                                        (* in *)
+                                        let (ifath, imoth, ifam) =
+                                          (Adef.iper_of_int (Int32.to_int fam_link.MLink.Family.ifath),
+                                           Adef.iper_of_int (Int32.to_int fam_link.MLink.Family.imoth),
+                                           Adef.ifam_of_int (Int32.to_int fam_link.MLink.Family.ifam))
+                                        in
+                                        let distant_base = fam_link.MLink.Family.baseprefix in
+                                        let cpl =
+                                          let ip = get_key_index p in
+                                          if distant_base = base_prefix then begin
+                                            (* link inside the same database. Not really well tested yet *)
+                                            (ifath, imoth, if ip = ifath then imoth else ifath)
+                                          end else begin
+                                            match Perso_link.get_person_link_with_base
+                                              conf.command ip distant_base
+                                            with
+                                            | Some p -> begin
+                                                let dist_ip = Adef.iper_of_int (Int32.to_int p.MLink.Person.ip) in
+                                                (* TODO: check this peice of code again *)
+                                                try let fc = Hashtbl.find ht (fam_link.MLink.Family.baseprefix, ip) in
+                                                    let () = add_alias (starting_bname, ip, factor) ~alias:(fam_link.MLink.Family.baseprefix,dist_ip,fc) in
+                                                    (ifath, imoth, if dist_ip = ifath then imoth else ifath)
+                                                with Not_found ->
+                                                     let () = Hashtbl.add ht (fam_link.MLink.Family.baseprefix, ip) 1 in
+                                                     let () = add_alias (starting_bname, ip, factor) ~alias:(fam_link.MLink.Family.baseprefix,dist_ip,1) in
+                                                     (ifath, imoth, if dist_ip = ifath then imoth else ifath)
+                                              end
+                                            | None -> (ifath, imoth, if ip = ifath then imoth else ifath)
+                                          end
+                                        in
+                                        let _ = cpl in
+                                        (* let () = printfn "iterating over family link" in *)
+                                        (* let (_, _, isp) = cpl in *)
+                                        (* isp is from another databse *)
+                                        (* let () = printfn "isp = %d" (Adef.int_of_iper isp) in *)
+                                        (* let sp_factor = *)
+                                        (*   try *)
+                                        (*     let i = Hashtbl.find ht (fam_link.MLink.Family.baseprefix, isp) + 1 in *)
+                                        (*     Hashtbl.replace ht (fam_link.MLink.Family.baseprefix, isp) i; *)
+                                        (*     i *)
+                                        (*   with Not_found -> Hashtbl.add ht (fam_link.MLink.Family.baseprefix, isp) 1; 1 *)
+                                        (* in *)
+                                        create_family_link (ifath, imoth) ifam fam families;
+                                        List.fold_left
+                                          (fun accu c_link ->
+                                            (* printfn "iter fam_link child"; *)
+                                            let baseprefix = c_link.MLink.Person_link.baseprefix in
+                                            (* let () = printfn "baseprefix = %s, base_prefix=%s" baseprefix base_prefix in *)
+                                            let ip_c =
+                                              Adef.iper_of_int (Int32.to_int c_link.MLink.Person_link.ip)
+                                            in
+                                            match Perso_link.get_person_link baseprefix ip_c with
+                                            | Some c_link ->
+                                                let can_merge =
+                                                  Perso_link.can_merge_child base_prefix
+                                                    (get_children fam) c_link
+                                                in
+                                                if can_merge then accu
+                                                else
+                                                  (* let () = print_endline "adding new child to the list" in *)
+                                                  let (c, _) = Perso_link.make_ep_link conf base c_link in
+
+                                                  (* let () = *)
+                                                  (*   let p = gen_person_of_person c in *)
+                                                  (*   printfn " '%s %s'" (sou base p.first_name)  (sou base p.surname); *)
+                                                  (* in *)
+
+                                                  let c_factor =
+                                                    try
+                                                      let i = Hashtbl.find ht (baseprefix, get_key_index c) + 1 in
+                                                      Hashtbl.replace ht (baseprefix, get_key_index c) i;
+                                                      i
+                                                    with Not_found -> Hashtbl.add ht (baseprefix, get_key_index c) 1; 1
+                                                  in
+
+                                                  maybe_append nodes (create_node c ifam gen Children baseprefix c_factor);
+                                                  maybe_append edges (create_edge (base_prefix,p,factor)    (baseprefix,c,c_factor) );
+                                                  (baseprefix, c, gen + 1) :: accu
+                                            | None -> accu)
+                                          accu fam_link.MLink.Family.children)
+                                  in
+                                  loop_child children_link;
+                                end
+                        in
+                        (* printfn "start loop_child from bname='%s' p='%s'" conf.bname (string_of_person p); *)
+                        loop_child [(conf.bname, p, gen)]
+                      in
+                      child_local
+                    end
+                  else accu)
+            in
+
+            (* lien inter arbre *)
+            (* let () = *)
+            (*   Perso_link.init_cache conf base (get_key_index p) 1 1 (max_gen - gen) *)
+            (* in *)
+            let () =
+              let ht = Hashtbl.create 42 in
+              let rec loop_desc l =
+                match l with
+                | [] -> ()
+                | (base_prefix, p, gen) :: l ->
+                    if gen >= max_gen then loop_desc l
+                    else
+                      begin
+                        (* printfn "iterating over %s" (string_of_person p); *)
+                        let ip = get_key_index p in
+                        let families = Perso_link.get_family_link base_prefix ip in
+                        let l = ListLabels.fold_left ~init:l families
+                          ~f:(fun accu fam_link ->
+                               let (ifath, imoth, ifam) =
+                                 (Adef.iper_of_int (Int32.to_int fam_link.MLink.Family.ifath),
+                                  Adef.iper_of_int (Int32.to_int fam_link.MLink.Family.imoth),
+                                  Adef.ifam_of_int (Int32.to_int fam_link.MLink.Family.ifam))
+                               in
+                               let cpl =
+                                 let ip = get_key_index p in
+                                 if ip <> ifath && ip <> imoth then
+                                   match
+                                     Perso_link.get_person_link_with_base
+                                       conf.command ip fam_link.MLink.Family.baseprefix
+                                   with
+                                   | Some p ->
+                                       let ip = Adef.iper_of_int (Int32.to_int p.MLink.Person.ip) in
+                                       (ifath, imoth, if ip = ifath then imoth else ifath)
+                                   | None -> (ifath, imoth, if ip = ifath then imoth else ifath)
+                                 else (ifath, imoth, if ip = ifath then imoth else ifath)
+                               in
+                               let can_merge =
+                                 let fam = List.map (foi base) (Array.to_list (get_family p)) in
+                                 (* let () = printfn "trying to merge families [%s]" (String.concat ";" (List.map string_of_fam fam)) in *)
+                                 Perso_link.can_merge_family conf.command (get_key_index p) fam fam_link cpl
+                               in
+                               if can_merge then accu
+                               else
+                                 (* let () = print_endline "can't merge family" in *)
+                                 let (_, _, isp) = cpl in
+                                 match Perso_link.get_person_link fam_link.MLink.Family.baseprefix isp with
+                                 | Some sp ->
+                                     let (sp, _) = Perso_link.make_ep_link conf base sp in
+                                     let baseprefix = fam_link.MLink.Family.baseprefix in
+                                     let ifam = Adef.ifam_of_int (Int32.to_int fam_link.MLink.Family.ifam) in
+                                     let sp_factor =
+                                       try
+                                         let i = Hashtbl.find ht (baseprefix, get_key_index sp) + 1 in
+                                         Hashtbl.replace ht (baseprefix, get_key_index sp) i;
+                                         i
+                                       with Not_found -> Hashtbl.add ht (baseprefix, get_key_index sp) 1; 1
+                                     in
+                                     (* printfn "Linked spouse is %s" (string_of_person sp); *)
+                                     maybe_append nodes (create_node sp ifam gen Spouse baseprefix sp_factor);
+                                     maybe_append edges (create_edge (base_prefix,p,factor) (baseprefix,sp,sp_factor) );
+
+                                     if gen <> max_gen then
+                                       begin
+                                         let family_link =
+                                           Perso_link.get_families_of_parents baseprefix ifath imoth
+                                         in
+                                         (* TODO ?
+                                         let (_, fam, _, _) =
+                                           Perso_link.make_efam_link conf base ip fam_link
+                                         in
+                                         create_family_link (ifath, imoth) ifam fam families;
+                                         *)
+                                         let children_link =
+                                           ListLabels.fold_left ~init:accu family_link
+                                           ~f:(fun accu fam_link ->
+                                               (* printfn "\titer family_link"; *)
+                                               List.fold_left
+                                                 (fun accu c_link ->
+                                                   (* printfn "\t\titer over c_link"; *)
+                                                   let baseprefix = c_link.MLink.Person_link.baseprefix in
+                                                   let ip_c =
+                                                     Adef.iper_of_int (Int32.to_int c_link.MLink.Person_link.ip)
+                                                   in
+                                                   match Perso_link.get_person_link baseprefix ip_c with
+                                                   | Some c_link ->
+                                                      let can_merge =
+                                                        Perso_link.can_merge_child base_prefix [| ip_c |]
+                                                                                   (* (get_children fam) *) c_link
+                                                      in
+                                                      if can_merge then accu
+                                                      else
+                                                       let (c, _) = Perso_link.make_ep_link conf base c_link in
+                                                       (* let () = print_endline "got a 'c'" in *)
+                                                       (* print_person c; *)
+                                                       let c_factor =
+                                                         try
+                                                           let i = Hashtbl.find ht (baseprefix, get_key_index c) + 1 in
+                                                           Hashtbl.replace ht (baseprefix, get_key_index c) i;
+                                                           i
+                                                         with Not_found -> Hashtbl.add ht (baseprefix, get_key_index c) 1; 1
+                                                       in
+                                                       maybe_append nodes (create_node c ifam gen Children baseprefix c_factor);
+                                                       maybe_append edges (create_edge (base_prefix, p,factor)    (baseprefix,c,c_factor) );
+                                                       maybe_append edges (create_edge (baseprefix, sp,sp_factor) (baseprefix,c,c_factor) );
+                                                       (baseprefix, c, gen + 1) :: accu
+                                                   | None -> accu)
+                                                 accu fam_link.MLink.Family.children)
+                                         in
+                                         children_link
+                                       end
+                                     else accu
+                                 | None -> accu)
+                        in
+                        loop_desc l
+                      end
+              in
+              (* let () = printfn "prepare for looping descendants of %s" (string_of_person p) in *)
+              loop_desc [(conf.bname, p, gen)]
+            in
+
+            loop l
+          end
+  in
+
+  maybe_append nodes (create_node p (Adef.ifam_of_int (-1)) 1 Root starting_bname 1);
+  loop [(p, 1)];
+  (* On retourne la liste pour avoir les noeuds dans l'ordre *)
+  (* la référence, suivi du père suivi, puis de la mère ...  *)
+  (List.rev !nodes, List.rev !edges, List.rev !families)
+;;
+
 
 (* Graphe de descendance *)
 
@@ -2106,6 +2661,16 @@ let build_graph_asc_v2 conf base p max_gen =
 
 (* Graphe de descendance v2 *)
 
+let build_graph_desc_v2 =
+  build_graph_desc_main pers_to_piqi_person_tree
+                        (fun id p ifam -> Mread.Node.({
+                                                         id = id;
+                                                         person = p;
+                                                         ifam = ifam;
+                                          })
+                        )
+
+(*
 let build_graph_desc_v2 conf base p max_gen =
 (*
   let () = load_descends_array base in
@@ -2398,7 +2963,7 @@ let build_graph_desc_v2 conf base p max_gen =
   (* la référence, suivi du père suivi, puis de la mère ...  *)
   (List.rev !nodes, List.rev !edges)
 ;;
-
+*)
 
 (* ********************************************************************* *)
 (*  [Fonc] print_tree_v2 : conf -> base -> todo                          *)
@@ -2443,7 +3008,7 @@ let print_graph_tree_v2 conf base =
     | Some n -> min max_desc (max (Int32.to_int n) 1)
     | None -> max_desc
   in
-  let (nodes_desc, edges_desc) = build_graph_desc_v2 conf base p nb_desc in
+  let (nodes_desc, edges_desc,_) = build_graph_desc_v2 conf base p nb_desc in
   let nodes_siblings =
     match get_parents p with
     | Some ifam ->
@@ -2818,130 +3383,6 @@ let pers_to_piqi_person_tree_full conf base p more_info gen max_gen base_prefix 
 ;;
 
 
-(* ********************************************************************* *)
-(*  [Fonc] fam_to_piqi_family_tree :
-             config -> base -> ifam -> Full_family                       *)
-(** [Description] :
-    [Args] :
-      - conf  : configuration de la base
-      - base  : base de donnée
-      - ifam  : ifam
-    [Retour] :
-      -
-    [Rem] : Non exporté en clair hors de ce module.                      *)
-(* ********************************************************************* *)
-let fam_to_piqi_family_tree conf base ifam =
-  let fam = foi base ifam in
-  let gen_f = Util.string_gen_family base (gen_family_of_family fam) in
-  let ifath = get_father fam in
-  let imoth = get_mother fam in
-  let m_auth =
-    authorized_age conf base (pget conf base ifath) &&
-    authorized_age conf base (pget conf base imoth)
-  in
-  let index = Int32.of_int (Adef.int_of_ifam ifam) in
-  let fsources =
-    if m_auth then Some gen_f.fsources
-    else None
-  in
-  let marriage =
-    match Adef.od_of_codate gen_f.marriage with
-    | Some d when m_auth -> Some (string_of_date conf d)
-    | _ -> None
-  in
-  let marriage_place =
-    if m_auth then Some gen_f.marriage_place
-    else None
-  in
-  let marriage_src =
-    if m_auth then Some gen_f.marriage_src
-    else None
-  in
-  let marriage_type =
-    match gen_f.relation with
-    | Married -> `married
-    | NotMarried -> `not_married
-    | Engaged -> `engaged
-    | NoSexesCheckNotMarried -> `no_sexes_check_not_married
-    | NoMention -> `no_mention
-    | NoSexesCheckMarried -> `no_sexes_check_married
-  in
-  let (divorce_type, divorce_date) =
-    match gen_f.divorce with
-    | NotDivorced -> (`not_divorced, None)
-    | Divorced cod ->
-        (match Adef.od_of_codate cod with
-         | Some d when m_auth -> (`divorced, Some (string_of_date conf d))
-         | _ -> (`divorced, None))
-    | Separated -> (`separated, None)
-  in
-  Mread.Family_tree_full.({
-    fsources = fsources;
-    marriage_date = marriage;
-    marriage_place = marriage_place;
-    marriage_src = marriage_src;
-    marriage_type = marriage_type;
-    divorce_type = divorce_type;
-    divorce_date = divorce_date;
-    index = index;
-  })
-;;
-
-
-(* *********************************************************************** *)
-(*  [Fonc] fam_to_piqi_family_tree_link :
-             config -> base -> ifam -> Full_family                         *)
-(** [Description] :
-    [Args] :
-      - conf  : configuration de la base
-      - base  : base de donnée
-      - ifam  : ifam
-    [Retour] :
-      -
-    [Rem] : Non exporté en clair hors de ce module.                        *)
-(* *********************************************************************** *)
-let fam_to_piqi_family_tree_link conf base (ifath, imoth) ifam fam =
-  let gen_f = Util.string_gen_family base (gen_family_of_family fam) in
-  let index = Int32.of_int (Adef.int_of_ifam ifam) in
-  let fsources = None in
-  let marriage =
-    match Adef.od_of_codate gen_f.marriage with
-    | Some d -> Some (string_of_date conf d)
-    | _ -> None
-  in
-  let marriage_place = Some gen_f.marriage_place in
-  let marriage_src = Some gen_f.marriage_src in
-  let marriage_type =
-    match gen_f.relation with
-    | Married -> `married
-    | NotMarried -> `not_married
-    | Engaged -> `engaged
-    | NoSexesCheckNotMarried -> `no_sexes_check_not_married
-    | NoMention -> `no_mention
-    | NoSexesCheckMarried -> `no_sexes_check_married
-  in
-  let (divorce_type, divorce_date) =
-    match gen_f.divorce with
-    | NotDivorced -> (`not_divorced, None)
-    | Divorced cod ->
-        (match Adef.od_of_codate cod with
-         | Some d -> (`divorced, Some (string_of_date conf d))
-         | _ -> (`divorced, None))
-    | Separated -> (`separated, None)
-  in
-  Mread.Family_tree_full.({
-    fsources = fsources;
-    marriage_date = marriage;
-    marriage_place = marriage_place;
-    marriage_src = marriage_src;
-    marriage_type = marriage_type;
-    divorce_type = divorce_type;
-    divorce_date = divorce_date;
-    index = index;
-  })
-;;
-
-
 (* Graphe d'ascendance (api.proto) *)
 
 let build_graph_asc_full conf base p max_gen =
@@ -3101,434 +3542,14 @@ let build_graph_asc_full conf base p max_gen =
 ;;
 
 
-module IntPairMap =
-  Map.Make(struct
-              type t = int64*int64
-              let compare: t -> t -> int = fun (x1,y1) (x2,y2) ->
-                let r = compare x1 x2 in
-                if r = 0 then compare y1 y2
-                else r
-            end)
-
-type temp_node_info = string * Adef.iper * int (* (base, index, factor) *)
-let string_of_nodeinfo (prefix,index,factor) =
-  sprintf "('%s',%d,%d)" prefix (Adef.int_of_iper index) factor
-
-
-
-(* Graphe de descendance (api.proto) *)
-let build_graph_desc_full conf base p max_gen =
-  printfn "build_graph_desc_full";
-
-  let starting_bname = conf.bname in
-
-  let myhash node_info =
-    let ans = Hashtbl.hash node_info in
-    (* printfn "  myhash %s = %d" (string_of_nodeinfo ni) ans; *)
-    ans
-  in
-
-  let maybe_append refs x =
-    match x with
-    | Some v -> refs := v :: !refs
-    | None -> ()
-  in
-
-  let person_aliases: (temp_node_info,temp_node_info) Hashtbl.t = Hashtbl.create 43 in
-  let add_alias info ~alias =
-    (* printfn "Adding alias %s <===> %s" (string_of_nodeinfo info) (string_of_nodeinfo alias); *)
-    Hashtbl.add person_aliases alias info
-  in
-  let get_real_info info =
-    try Hashtbl.find person_aliases info
-    with Not_found -> info
-  in
-
-  let edges_mem: Mread.Edge.t IntPairMap.t ref = ref IntPairMap.empty in
-  let create_edge (baseprefix_from, p_from, factor_from) (baseprefix_to, p_to, factor_to) =
-    (* Pour les liens inter arbres, on rend l'id unique avec *)
-    (* le prefix de la base et l'index de la personne.       *)
-    let info_from = (baseprefix_from, get_key_index p_from, factor_from) in
-    let info_from = get_real_info info_from in
-    let id_from =  Int64.of_int (myhash info_from) in
-
-    let info_to = (baseprefix_to, get_key_index p_to, factor_to) in
-    let info_to = get_real_info info_to in
-    let id_to = Int64.of_int (myhash info_to) in
-
-    try let _ = IntPairMap.find (id_from,id_to) !edges_mem in
-        (* already added *)
-        None
-    with Not_found ->
-      (* let () = printfn "create edge %s -> %s" (Int64.to_string id_from) (Int64.to_string id_to) in *)
-      let e = Mread.Edge.({ from_node = id_from; to_node = id_to; }) in
-      (* let () = printf "********* adding (%Ld,%Ld) to edges_mem map\n" id_from id_to in *)
-      let () = edges_mem := IntPairMap.add (id_from,id_to) e !edges_mem in
-      Some e
-  in
-
-  let nodes_mem: (int, Mread.Node_full.t) Hashtbl.t = Hashtbl.create 97 in
-  let create_node p ifam gen more_info base_prefix factor =
-    (* Pour les liens inter arbres, on rend l'id unique avec *)
-    (* le prefix de la base et l'index de la personne.       *)
-    let uniq_id = myhash (base_prefix, get_key_index p, factor) in
-    try let _ = Hashtbl.find nodes_mem uniq_id in
-        None
-    with Not_found ->
-      (* let () = printfn "create_node '%s' unique_id=%d" (string_of_graph_more_info more_info) uniq_id in *)
-      let id = Int64.of_int uniq_id in
-      let p = pers_to_piqi_person_tree_full conf base p more_info gen max_gen base_prefix in
-      let ifam = Int64.of_int (Adef.int_of_ifam ifam) in
-      let ans = Mread.Node_full.({
-        id = id;
-        person = p;
-        ifam = Some ifam;
-      })
-      in
-      let () = Hashtbl.add nodes_mem uniq_id ans in
-      Some ans
-  in
-  let create_family ifam families =
-    if p_getenv conf.env "full_infos" = Some "1" then
-      families := (fam_to_piqi_family_tree conf base ifam) :: !families
-  in
-  let create_family_link (ifath, imoth) ifam fam families =
-    if p_getenv conf.env "full_infos" = Some "1" then
-      families :=
-        (fam_to_piqi_family_tree_link conf base (ifath, imoth) ifam fam) :: !families
-  in
-(*
-  let print_person p =
-    let gp = gen_person_of_person p in
-    printfn " '%s %s'" (sou base gp.first_name)  (sou base gp.surname)
-  in
-
-  let string_of_person p =
-    let gp = gen_person_of_person p in
-    sprintf "%s %s" (sou base gp.first_name)  (sou base gp.surname)
-  in
-  let string_of_iper ip =
-    let p = poi base ip in
-    let gp = gen_person_of_person p in
-    sprintf "%d %s %s" (Adef.int_of_iper ip) (sou base gp.first_name)  (sou base gp.surname)
-  in
-  let string_of_fam f =
-    let cpl = gen_couple_of_couple f in
-    sprintf " %s & %s'" (string_of_iper (Adef.father cpl)) (string_of_iper (Adef.mother cpl))
-  in
-
-  let string_of_famlink l =
-    sprintf "{ ifath=%ld; imoth=%ld; ifam=%ld; baseprefix='%s' }" l.MLink.Family.ifath l.MLink.Family.imoth l.MLink.Family.ifam l.MLink.Family.baseprefix
-  in
- *)
-  let ht: (Adef.iper, int) Hashtbl.t = Hashtbl.create 42 in
-
-  let nodes = ref [] in
-  let edges = ref [] in
-  let families = ref [] in
-  let rec loop l =
-    match l with
-    | [] -> ()
-    | (p, gen) :: l ->
-        if gen >= max_gen then loop l
-        else
-          begin
-            (* let () = printfn "top-level loop" in *)
-            let factor =
-              try Hashtbl.find ht (get_key_index p) with Not_found -> 1
-            in
-            let ifam = get_family p in
-            let l =
-              ListLabels.fold_left ~init:l (Array.to_list ifam)
-                ~f:(fun accu ifam ->
-                  (* let () = printfn "\t iterating over family %d" (Adef.int_of_ifam ifam) in *)
-                  let fam = foi base ifam in
-                  let sp = poi base (Gutil.spouse (get_key_index p) fam) in
-                  let sp_factor =
-                    try
-                      let i = Hashtbl.find ht (get_key_index sp) + 1 in
-                      Hashtbl.replace ht (get_key_index sp) i;
-                      i
-                    with Not_found -> Hashtbl.add ht (get_key_index sp) 1; 1
-                  in
-                  let children =
-                    List.map (poi base) (Array.to_list (get_children fam))
-                  in
-                  maybe_append nodes (create_node sp ifam gen Spouse starting_bname sp_factor);
-                  maybe_append edges (create_edge (starting_bname,p,factor) (starting_bname,sp,sp_factor) );
-                  if gen <> max_gen then
-                    begin
-                      List.iter
-                        (fun c ->
-                          (* printfn "\t\t iterating over child in the family %d" (Adef.int_of_ifam ifam); *)
-                          (* let () = print_person c in *)
-                          let c_factor : int =
-                            try
-                              let i = Hashtbl.find ht (get_key_index c) + 1 in
-                              Hashtbl.replace ht (get_key_index c) i;
-                              i
-                            with Not_found -> Hashtbl.add ht (get_key_index c) 1; 1
-                          in
-                          maybe_append nodes (create_node c ifam gen Children starting_bname c_factor);
-                          maybe_append edges (create_edge (starting_bname, p,factor)    (starting_bname,c,c_factor) );
-                          maybe_append edges (create_edge (starting_bname,sp,sp_factor) (starting_bname,c,sp_factor)) )
-                        children;
-                      create_family ifam families;
-                      let child_local =
-                        List.fold_left
-                          (fun accu c -> (c, gen + 1) :: accu)
-                          accu children
-                      in
-
-
-                      (* printfn "\t\t Now trying to iterate over children linked with current family"; *)
-                      (* lien inter arbre *)
-                      let () =
-                        Perso_link.init_cache conf base (get_key_index p) 1 1 (max_gen - gen)
-                      in
-                      let () =
-                        let ht = Hashtbl.create 42 in
-                        let rec loop_child fam_link =
-                          match fam_link with
-                          | [] -> ()
-                          | (base_prefix, p, gen) :: l ->
-                              if gen >= max_gen then loop_child l
-                              else
-                                begin
-                                  (* let () = printfn "loop_child over fam_links: ('%s',%d,_)" base_prefix (Adef.int_of_iper (get_key_index p)) in *)
-                                  let factor =
-                                    try Hashtbl.find ht (base_prefix, get_key_index p) with Not_found -> 1
-                                  in
-                                  let family_link =
-                                    Perso_link.get_family_link base_prefix (get_key_index p)
-                                  in
-                                  let children_link =
-                                    ListLabels.fold_left ~init:l family_link
-                                    ~f:(fun accu fam_link ->
-                                        (* let () = printf "iterating over children in fam_link %s, (get_key_index p)=%d\n%!" *)
-                                        (*                 (string_of_famlink fam_link) (Adef.int_of_iper (get_key_index p)) *)
-                                        (* in *)
-                                        let (ifath, imoth, ifam) =
-                                          (Adef.iper_of_int (Int32.to_int fam_link.MLink.Family.ifath),
-                                           Adef.iper_of_int (Int32.to_int fam_link.MLink.Family.imoth),
-                                           Adef.ifam_of_int (Int32.to_int fam_link.MLink.Family.ifam))
-                                        in
-                                        let distant_base = fam_link.MLink.Family.baseprefix in
-                                        let cpl =
-                                          let ip = get_key_index p in
-                                          if distant_base = base_prefix then begin
-                                            (* link inside the same database. Not really well tested yet *)
-                                            (ifath, imoth, if ip = ifath then imoth else ifath)
-                                          end else begin
-                                            match Perso_link.get_person_link_with_base
-                                              conf.command ip distant_base
-                                            with
-                                            | Some p -> begin
-                                                let dist_ip = Adef.iper_of_int (Int32.to_int p.MLink.Person.ip) in
-                                                (* TODO: check this peice of code again *)
-                                                try let fc = Hashtbl.find ht (fam_link.MLink.Family.baseprefix, ip) in
-                                                    let () = add_alias (starting_bname, ip, factor) ~alias:(fam_link.MLink.Family.baseprefix,dist_ip,fc) in
-                                                    (ifath, imoth, if dist_ip = ifath then imoth else ifath)
-                                                with Not_found ->
-                                                     let () = Hashtbl.add ht (fam_link.MLink.Family.baseprefix, ip) 1 in
-                                                     let () = add_alias (starting_bname, ip, factor) ~alias:(fam_link.MLink.Family.baseprefix,dist_ip,1) in
-                                                     (ifath, imoth, if dist_ip = ifath then imoth else ifath)
-                                              end
-                                            | None -> (ifath, imoth, if ip = ifath then imoth else ifath)
-                                          end
-                                        in
-                                        let _ = cpl in
-                                        (* let () = printfn "iterating over family link" in *)
-                                        (* let (_, _, isp) = cpl in *)
-                                        (* isp is from another databse *)
-                                        (* let () = printfn "isp = %d" (Adef.int_of_iper isp) in *)
-                                        (* let sp_factor = *)
-                                        (*   try *)
-                                        (*     let i = Hashtbl.find ht (fam_link.MLink.Family.baseprefix, isp) + 1 in *)
-                                        (*     Hashtbl.replace ht (fam_link.MLink.Family.baseprefix, isp) i; *)
-                                        (*     i *)
-                                        (*   with Not_found -> Hashtbl.add ht (fam_link.MLink.Family.baseprefix, isp) 1; 1 *)
-                                        (* in *)
-                                        create_family_link (ifath, imoth) ifam fam families;
-                                        List.fold_left
-                                          (fun accu c_link ->
-                                            (* printfn "iter fam_link child"; *)
-                                            let baseprefix = c_link.MLink.Person_link.baseprefix in
-                                            (* let () = printfn "baseprefix = %s, base_prefix=%s" baseprefix base_prefix in *)
-                                            let ip_c =
-                                              Adef.iper_of_int (Int32.to_int c_link.MLink.Person_link.ip)
-                                            in
-                                            match Perso_link.get_person_link baseprefix ip_c with
-                                            | Some c_link ->
-                                                let can_merge =
-                                                  Perso_link.can_merge_child base_prefix
-                                                    (get_children fam) c_link
-                                                in
-                                                if can_merge then accu
-                                                else
-                                                  (* let () = print_endline "adding new child to the list" in *)
-                                                  let (c, _) = Perso_link.make_ep_link conf base c_link in
-
-                                                  (* let () = *)
-                                                  (*   let p = gen_person_of_person c in *)
-                                                  (*   printfn " '%s %s'" (sou base p.first_name)  (sou base p.surname); *)
-                                                  (* in *)
-
-                                                  let c_factor =
-                                                    try
-                                                      let i = Hashtbl.find ht (baseprefix, get_key_index c) + 1 in
-                                                      Hashtbl.replace ht (baseprefix, get_key_index c) i;
-                                                      i
-                                                    with Not_found -> Hashtbl.add ht (baseprefix, get_key_index c) 1; 1
-                                                  in
-
-                                                  maybe_append nodes (create_node c ifam gen Children baseprefix c_factor);
-                                                  maybe_append edges (create_edge (base_prefix,p,factor)    (baseprefix,c,c_factor) );
-                                                  (baseprefix, c, gen + 1) :: accu
-                                            | None -> accu)
-                                          accu fam_link.MLink.Family.children)
-                                  in
-                                  loop_child children_link;
-                                end
-                        in
-                        (* printfn "start loop_child from bname='%s' p='%s'" conf.bname (string_of_person p); *)
-                        loop_child [(conf.bname, p, gen)]
-                      in
-                      child_local
-                    end
-                  else accu)
-            in
-
-            (* lien inter arbre *)
-            (* let () = *)
-            (*   Perso_link.init_cache conf base (get_key_index p) 1 1 (max_gen - gen) *)
-            (* in *)
-            let () =
-              let ht = Hashtbl.create 42 in
-              let rec loop_desc l =
-                match l with
-                | [] -> ()
-                | (base_prefix, p, gen) :: l ->
-                    if gen >= max_gen then loop_desc l
-                    else
-                      begin
-                        (* printfn "iterating over %s" (string_of_person p); *)
-                        let ip = get_key_index p in
-                        let families = Perso_link.get_family_link base_prefix ip in
-                        let l = ListLabels.fold_left ~init:l families
-                          ~f:(fun accu fam_link ->
-                               let (ifath, imoth, ifam) =
-                                 (Adef.iper_of_int (Int32.to_int fam_link.MLink.Family.ifath),
-                                  Adef.iper_of_int (Int32.to_int fam_link.MLink.Family.imoth),
-                                  Adef.ifam_of_int (Int32.to_int fam_link.MLink.Family.ifam))
-                               in
-                               let cpl =
-                                 let ip = get_key_index p in
-                                 if ip <> ifath && ip <> imoth then
-                                   match
-                                     Perso_link.get_person_link_with_base
-                                       conf.command ip fam_link.MLink.Family.baseprefix
-                                   with
-                                   | Some p ->
-                                       let ip = Adef.iper_of_int (Int32.to_int p.MLink.Person.ip) in
-                                       (ifath, imoth, if ip = ifath then imoth else ifath)
-                                   | None -> (ifath, imoth, if ip = ifath then imoth else ifath)
-                                 else (ifath, imoth, if ip = ifath then imoth else ifath)
-                               in
-                               let can_merge =
-                                 let fam = List.map (foi base) (Array.to_list (get_family p)) in
-                                 (* let () = printfn "trying to merge families [%s]" (String.concat ";" (List.map string_of_fam fam)) in *)
-                                 Perso_link.can_merge_family conf.command (get_key_index p) fam fam_link cpl
-                               in
-                               if can_merge then accu
-                               else
-                                 (* let () = print_endline "can't merge family" in *)
-                                 let (_, _, isp) = cpl in
-                                 match Perso_link.get_person_link fam_link.MLink.Family.baseprefix isp with
-                                 | Some sp ->
-                                     let (sp, _) = Perso_link.make_ep_link conf base sp in
-                                     let baseprefix = fam_link.MLink.Family.baseprefix in
-                                     let ifam = Adef.ifam_of_int (Int32.to_int fam_link.MLink.Family.ifam) in
-                                     let sp_factor =
-                                       try
-                                         let i = Hashtbl.find ht (baseprefix, get_key_index sp) + 1 in
-                                         Hashtbl.replace ht (baseprefix, get_key_index sp) i;
-                                         i
-                                       with Not_found -> Hashtbl.add ht (baseprefix, get_key_index sp) 1; 1
-                                     in
-                                     (* printfn "Linked spouse is %s" (string_of_person sp); *)
-                                     maybe_append nodes (create_node sp ifam gen Spouse baseprefix sp_factor);
-                                     maybe_append edges (create_edge (base_prefix,p,factor) (baseprefix,sp,sp_factor) );
-
-                                     if gen <> max_gen then
-                                       begin
-                                         let family_link =
-                                           Perso_link.get_families_of_parents baseprefix ifath imoth
-                                         in
-                                         (* TODO ?
-                                         let (_, fam, _, _) =
-                                           Perso_link.make_efam_link conf base ip fam_link
-                                         in
-                                         create_family_link (ifath, imoth) ifam fam families;
-                                         *)
-                                         let children_link =
-                                           ListLabels.fold_left ~init:accu family_link
-                                           ~f:(fun accu fam_link ->
-                                               (* printfn "\titer family_link"; *)
-                                               List.fold_left
-                                                 (fun accu c_link ->
-                                                   (* printfn "\t\titer over c_link"; *)
-                                                   let baseprefix = c_link.MLink.Person_link.baseprefix in
-                                                   let ip_c =
-                                                     Adef.iper_of_int (Int32.to_int c_link.MLink.Person_link.ip)
-                                                   in
-                                                   match Perso_link.get_person_link baseprefix ip_c with
-                                                   | Some c_link ->
-                                                      let can_merge =
-                                                        Perso_link.can_merge_child base_prefix [| ip_c |]
-                                                                                   (* (get_children fam) *) c_link
-                                                      in
-                                                      if can_merge then accu
-                                                      else
-                                                       let (c, _) = Perso_link.make_ep_link conf base c_link in
-                                                       (* let () = print_endline "got a 'c'" in *)
-                                                       (* print_person c; *)
-                                                       let c_factor =
-                                                         try
-                                                           let i = Hashtbl.find ht (baseprefix, get_key_index c) + 1 in
-                                                           Hashtbl.replace ht (baseprefix, get_key_index c) i;
-                                                           i
-                                                         with Not_found -> Hashtbl.add ht (baseprefix, get_key_index c) 1; 1
-                                                       in
-                                                       maybe_append nodes (create_node c ifam gen Children baseprefix c_factor);
-                                                       maybe_append edges (create_edge (base_prefix, p,factor)    (baseprefix,c,c_factor) );
-                                                       maybe_append edges (create_edge (baseprefix, sp,sp_factor) (baseprefix,c,c_factor) );
-                                                       (baseprefix, c, gen + 1) :: accu
-                                                   | None -> accu)
-                                                 accu fam_link.MLink.Family.children)
-                                         in
-                                         children_link
-                                       end
-                                     else accu
-                                 | None -> accu)
-                        in
-                        loop_desc l
-                      end
-              in
-              (* let () = printfn "prepare for looping descendants of %s" (string_of_person p) in *)
-              loop_desc [(conf.bname, p, gen)]
-            in
-
-            loop l
-          end
-  in
-
-  maybe_append nodes (create_node p (Adef.ifam_of_int (-1)) 1 Root starting_bname 1);
-  loop [(p, 1)];
-  (* On retourne la liste pour avoir les noeuds dans l'ordre *)
-  (* la référence, suivi du père suivi, puis de la mère ...  *)
-  (List.rev !nodes, List.rev !edges, List.rev !families)
-;;
+let build_graph_desc_full =
+  build_graph_desc_main pers_to_piqi_person_tree_full
+                        (fun id p ifam -> Mread.Node_full.({
+                                                              id = id;
+                                                              person = p;
+                                                              ifam = ifam;
+                                          })
+                        )
 
 (* let build_graph_desc_full conf base p max_gen = *)
 (*   printf "build_graph_desc_full starts =================================================================\n%!"; *)
