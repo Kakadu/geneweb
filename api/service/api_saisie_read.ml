@@ -2511,7 +2511,7 @@ let print_graph_tree conf base =
 
 (* Graphe d'ascendance v2 *)
 
-let build_graph_asc_v2 conf base p max_gen =
+let build_graph_asc_main pers_to_piqi make_node_helper conf base p max_gen =
 (*
   let () = load_ascends_array base in
   let () = load_unions_array base in
@@ -2538,21 +2538,24 @@ let build_graph_asc_v2 conf base p max_gen =
     (* le prefix de la base et l'index de la personne.       *)
     let uniq_id = Hashtbl.hash (base_prefix, get_key_index p, factor) in
     let id = Int64.of_int uniq_id in
-    let p = pers_to_piqi_person_tree conf base p more_info gen max_gen base_prefix in
-    Mread.Node.({
-      id = id;
-      person = p;
-      ifam = None;
-    })
+    let p = pers_to_piqi conf base p more_info gen max_gen base_prefix in
+    make_node_helper id p None
   in
-(*
+
   let create_family ifam families =
     if p_getenv conf.env "full_infos" = Some "1" then
-      families := (fam_to_piqi_family conf base ifam) :: !families
+      families := (fam_to_piqi_family_tree conf base ifam) :: !families
   in
-*)
+  let create_family_link (ifath, imoth) ifam fam families =
+    if p_getenv conf.env "full_infos" = Some "1" then
+      families :=
+        (fam_to_piqi_family_tree_link conf base (ifath, imoth) ifam fam) :: !families
+  in
+
   let nodes = ref [] in
   let edges = ref [] in
+  let families = ref [] in
+
   let rec loop l =
     match l with
     | [] -> ()
@@ -2586,7 +2589,7 @@ let build_graph_asc_v2 conf base p max_gen =
                 nodes := create_node moth gen Ancestor conf.command moth_factor :: !nodes;
                 edges := create_edge factor conf.command p fath_factor conf.command fath :: !edges;
                 edges := create_edge factor conf.command p moth_factor conf.command moth :: !edges;
-                (*create_family ifam families;*)
+                create_family ifam families;
                 loop ((fath, gen + 1) :: (moth, gen + 1) :: l)
             | None ->
                 (* lien inter arbre *)
@@ -2611,6 +2614,7 @@ let build_graph_asc_v2 conf base p max_gen =
                               begin
                                 let ifath = Adef.iper_of_int (Int32.to_int family.MLink.Family.ifath) in
                                 let imoth = Adef.iper_of_int (Int32.to_int family.MLink.Family.imoth) in
+                                let (ifam, fam, _, _) = Perso_link.make_efam_link conf base ifath family in
                                 let fam_base_prefix = family.MLink.Family.baseprefix in
                                 match
                                   (Perso_link.get_person_link fam_base_prefix ifath,
@@ -2638,6 +2642,7 @@ let build_graph_asc_v2 conf base p max_gen =
                                     nodes := create_node moth gen Ancestor pmoth.MLink.Person.baseprefix moth_factor :: !nodes;
                                     edges := create_edge factor base_prefix p fath_factor pfath.MLink.Person.baseprefix fath :: !edges;
                                     edges := create_edge factor base_prefix p moth_factor pmoth.MLink.Person.baseprefix moth :: !edges;
+                                    create_family_link (ifath, imoth) ifam fam families;
                                     let l =
                                       ((fam_base_prefix, fath, gen + 1) :: (fam_base_prefix, moth, gen + 1) :: l)
                                     in
@@ -2655,20 +2660,17 @@ let build_graph_asc_v2 conf base p max_gen =
   loop [(p, 1)];
   (* On retourne la liste pour avoir les noeuds dans l'ordre *)
   (* la référence, suivi du père suivi, puis de la mère ...  *)
-  (List.rev !nodes, List.rev !edges)
+  (List.rev !nodes, List.rev !edges, List.rev !families)
 ;;
 
+let make_node_v2 id p ifam =
+  Mread.Node.({ id = id; person = p; ifam = ifam; })
 
-(* Graphe de descendance v2 *)
+let build_graph_asc_v2 =
+  build_graph_asc_main pers_to_piqi_person_tree make_node_v2
 
 let build_graph_desc_v2 =
-  build_graph_desc_main pers_to_piqi_person_tree
-                        (fun id p ifam -> Mread.Node.({
-                                                         id = id;
-                                                         person = p;
-                                                         ifam = ifam;
-                                          })
-                        )
+  build_graph_desc_main pers_to_piqi_person_tree make_node_v2
 
 (*
 let build_graph_desc_v2 conf base p max_gen =
@@ -2987,7 +2989,7 @@ let print_graph_tree_v2 conf base =
   in
   (* cache lien inter arbre *)
   let () = Perso_link.init_cache conf base ip 1 1 1 in
-  let (nodes_asc, edges_asc) = build_graph_asc_v2 conf base p nb_asc in
+  let (nodes_asc, edges_asc,_) = build_graph_asc_v2 conf base p nb_asc in
   (*
   let nodes_asc =
     List.rev_map
@@ -3384,7 +3386,7 @@ let pers_to_piqi_person_tree_full conf base p more_info gen max_gen base_prefix 
 
 
 (* Graphe d'ascendance (api.proto) *)
-
+(*
 let build_graph_asc_full conf base p max_gen =
   (* printfn "inside build_graph_asc_full"; *)
 (*
@@ -3540,16 +3542,16 @@ let build_graph_asc_full conf base p max_gen =
   (* la référence, suivi du père suivi, puis de la mère ...  *)
   (List.rev !nodes, List.rev !edges, List.rev !families)
 ;;
+*)
 
+let make_node_full id p ifam =
+  Mread.Node_full.({ id = id; person = p; ifam = ifam; })
 
 let build_graph_desc_full =
-  build_graph_desc_main pers_to_piqi_person_tree_full
-                        (fun id p ifam -> Mread.Node_full.({
-                                                              id = id;
-                                                              person = p;
-                                                              ifam = ifam;
-                                          })
-                        )
+  build_graph_desc_main pers_to_piqi_person_tree_full make_node_full
+
+let build_graph_asc_full =
+  build_graph_asc_main pers_to_piqi_person_tree_full make_node_full
 
 (* let build_graph_desc_full conf base p max_gen = *)
 (*   printf "build_graph_desc_full starts =================================================================\n%!"; *)
