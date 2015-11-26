@@ -3896,3 +3896,6 @@ value real_nb_of_persons conf base =
         }
       with [ _ -> Gwdb.nb_of_persons base ] ]
 ;
+
+value printfn fmt = Printf.kprintf (Printf.printf "%s\n%!") fmt
+;
