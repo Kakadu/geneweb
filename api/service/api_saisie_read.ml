@@ -1606,7 +1606,7 @@ let build_graph_asc conf base p max_gen base_loop : (Mread.Node.t list * Mread.E
                               match Perso_link.get_parents_link base_prefix ip with
                               | Some family ->
                                   begin
-                                  let () = printf "Perso_link.get_parents_link %s %d = Some _\n%!"  base_prefix (Adef.int_of_iper ip) in
+                                  (* let () = printf "Perso_link.get_parents_link %s %d = Some _\n%!"  base_prefix (Adef.int_of_iper ip) in *)
                                   let ifath = Adef.iper_of_int (Int32.to_int family.MLink.Family.ifath) in
                                   let imoth = Adef.iper_of_int (Int32.to_int family.MLink.Family.imoth) in
                                   let fam_base_prefix = family.MLink.Family.baseprefix in
@@ -1629,7 +1629,7 @@ let build_graph_asc conf base p max_gen base_loop : (Mread.Node.t list * Mread.E
                                   | _ -> loop_parents nodes edges l
                                   end
                               | None ->
-                                 let () = printf "Perso_link.get_parents_link %s %d = None\n%!"  base_prefix (Adef.int_of_iper ip) in
+                                 (* let () = printf "Perso_link.get_parents_link %s %d = None\n%!"  base_prefix (Adef.int_of_iper ip) in *)
                                  loop_parents nodes edges l
                       in
                       loop_parents nodes edges [(conf.bname, p, gen)]
@@ -1783,6 +1783,13 @@ let string_of_nodeinfo (prefix,index,factor) =
   sprintf "('%s',%d,%d)" prefix (Adef.int_of_iper index) factor
 
 
+let print_person ~base p =
+  let gp = gen_person_of_person p in
+  printfn " '%s %s'" (sou base gp.first_name) (sou base gp.surname)
+
+let string_of_person ~base p =
+  let gp = gen_person_of_person p in
+  sprintf "%s %s" (sou base gp.first_name) (sou base gp.surname)
 
 
 (* Graphe de descendance (api.proto) *)
